@@ -1,7 +1,7 @@
 .. contents::
 
-PLONE.SERVER.GCLOUDSTORAGE
-==========================
+PSERVER.S3STORAGE
+=================
 
-GCloud blob storage for plone.server.
+S3 blob storage for plone.server.
 

@@ -3,7 +3,7 @@
 
   	<include package="plone.server" file="meta.zcml" />
 
-  	<adapter factory="pserver.s3storage.storage.GCloudFileManager" />
+  	<adapter factory="pserver.s3storage.storage.S3FileManager" />
   	<adapter factory="pserver.s3storage.storage.json_converter" />
 
 </configure>

@@ -28,7 +28,7 @@ import uuid
 import aiohttp
 import asyncio
 import json
-import boto
+import boto3
 import base64
 from io import BytesIO
 
@@ -78,7 +78,7 @@ class S3FileManager(object):
         """
         file = self.field.get(self.context)
         if file is None:
-            file = GCloudFile(contentType=self.request.content_type)
+            file = S3File(contentType=self.request.content_type)
             self.field.set(self.context, file)
         if 'X-UPLOAD-MD5HASH' in self.request.headers:
             file._md5hash = self.request.headers['X-UPLOAD-MD5HASH']
@@ -130,7 +130,7 @@ class S3FileManager(object):
     async def tus_create(self):
         file = self.field.get(self.context)
         if file is None:
-            file = GCloudFile(contentType=self.request.content_type)
+            file = S3File(contentType=self.request.content_type)
             self.field.set(self.context, file)
         if 'CONTENT-LENGTH' in self.request.headers:
             file._current_upload = int(self.request.headers['CONTENT-LENGTH'])
@@ -304,59 +304,17 @@ class S3File(Persistent):
                 pass
 
         self._upload_file_id = request._site_id + '/' + uuid.uuid4().hex
-        init_url = UPLOAD_URL.format(bucket=util.bucket) + '&name=' +\
-            self._upload_file_id
-        session = aiohttp.ClientSession()
-
-        creator = ','.join([x.principal.id for x
-                            in request.security.participations])
-        metadata = json.dumps({
-            'CREATOR': creator,
-            'REQUEST': str(request),
-            'NAME': self.filename
-        })
-        call_size = len(metadata)
-        async with session.post(
-                init_url,
-                headers={
-                    'AUTHORIZATION': 'Bearer %s' % util.access_token,
-                    'X-Upload-Content-Type': self.contentType,
-                    'X-Upload-Content-Length': str(self._size),
-                    'Content-Type': 'application/json; charset=UTF-8',
-                    'Content-Length': str(call_size)
-                },
-                data=metadata) as call:
-            if call.status != 200:
-                text = await call.text()
-                raise GoogleCloudException(text)
-            self._resumable_uri = call.headers['Location']
-        session.close()
+        self._mpu = util.bucket.initiate_multipart_upload(
+            self._upload_file_id)
         self._current_upload = 0
+        self._block = 0
         self._resumable_uri_date = datetime.now(tz=tzlocal())
-        await notify(InitialGCloudUpload(context))
+        await notify(InitialS3Upload(context))
 
     async def appendData(self, data):
-        session = aiohttp.ClientSession()
 
-        content_range = 'bytes {init}-{chunk}/{total}'.format(
-            init=self._current_upload,
-            chunk=self._current_upload + len(data) - 1,
-            total=self._size)
-        async with session.put(
-                self._resumable_uri,
-                headers={
-                    'Content-Length': str(len(data)),
-                    'Content-Type': self.contentType,
-                    'Content-Range': content_range
-                },
-                data=data) as call:
-            text = await call.text()  # noqa
-            # assert call.status in [200, 201, 308]
-            if call.status == 308:
-                self._current_upload = int(call.headers['Range'].split('-')[1])
-            if call.status in [200, 201]:
-                self._current_upload = self._size
-        session.close()
+        self._mpu.upload_part_from_file(data, self._block, cb=progress)
+        self._block += 1
         return call
 
     def actualSize(self):
@@ -448,29 +406,15 @@ class S3FileField(Object):
 class S3BlobStore(object):
 
     def __init__(self, settings):
-        self._json_credentials = settings['json_credentials']
-        self._project = settings['project'] if 'project' in settings else None
-        self._credentials = ServiceAccountCredentials.from_json_keyfile_name(
-            self._json_credentials, SCOPES)
-        self._service = discovery.build(
-            'storage', 'v1', credentials=self._credentials)
-        self._client = storage.Client(
-            project=self._project, credentials=self._credentials)
-        self._bucket = settings['bucket']
-        self._access_token = self._credentials.get_access_token()
-        self._creation_access_token = datetime.now()
-
-    @property
-    def access_token(self):
-        # expires = self._creation_access_token + timedelta(seconds=self._access_token.expires_in)  # noqa
-        # expires_margin = datetime.now() - timedelta(seconds=60)
-
-        # if expires_margin < expires:
-        #     self._access_token = self._credentials.get_access_token()
-        #     self._creation_access_token = datetime.now()
-        self._access_token = self._credentials.get_access_token()
-        self._creation_access_token = datetime.now()
-        return self._access_token.access_token
+        # self._aws_access_key = settings['AWS_ACCESS_KEY_ID']
+        # self._aws_secret_key = settings['AWS_SECRET_ACCESS_KEY']
+        # self._s3 = boto3.client(
+        #     's3',
+        #     aws_access_key_id=self._aws_access_key,
+        #     aws_secret_access_key=self._aws_secret_key
+        # )
+        self._bucket_name = settings['bucket']
+        self._s3 = boto3.resource('s3')
 
     @property
     def bucket(self):
@@ -480,12 +424,8 @@ class S3BlobStore(object):
         else:
             char_delimiter = '_'
         bucket_name = request._site_id.lower() + char_delimiter + self._bucket
-        try:
-            bucket = self._client.get_bucket(bucket_name)  # noqa
-        except NotFound:
-            bucket = self._client.create_bucket(bucket_name)  # noqa
-            log.warn('We needed to create bucket ' + bucket_name)
-        return bucket_name
+        bucket = self._s3.lookup(bucket_name)
+        return bucket
 
     async def initialize(self, app=None):
         # No asyncio loop to run

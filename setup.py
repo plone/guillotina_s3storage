@@ -24,7 +24,7 @@ setup(
     install_requires=[
         'setuptools',
         'plone.server',
-        'boto',
+        'boto3',
         'ujson',
     ],
     tests_require=[
