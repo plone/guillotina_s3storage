@@ -27,6 +27,7 @@ import logging
 import uuid
 import aiohttp
 import asyncio
+import botocore
 import json
 import boto3
 import base64
@@ -37,8 +38,6 @@ log = logging.getLogger(__name__)
 
 MAX_SIZE = 1073741824
 
-SCOPES = ['https://www.googleapis.com/auth/devstorage.read_write']
-UPLOAD_URL = 'https://www.googleapis.com/upload/storage/v1/b/{bucket}/o?uploadType=resumable'  # noqa
 CHUNK_SIZE = 524288
 MAX_RETRIES = 5
 
@@ -105,25 +104,12 @@ class S3FileManager(object):
         while data:
             old_current_upload = file._current_upload
             resp = await file.appendData(data)
-            readed_bytes = file._current_upload - old_current_upload
 
-            data = data[readed_bytes:]
+            try:
+                data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
+            except asyncio.IncompleteReadError as e:
+                data = e.partial
 
-            bytes_to_read = readed_bytes
-
-            if resp.status in [200, 201]:
-                break
-            if resp.status == 308:
-                count = 0
-                try:
-                    data += await self.request.content.readexactly(bytes_to_read)  # noqa
-                except asyncio.IncompleteReadError as e:
-                    data += e.partial
-
-            else:
-                count += 1
-                if count > MAX_RETRIES:
-                    raise AttributeError('MAX retries error')
         # Test resp and checksum to finish upload
         await file.finishUpload(self.context)
 
@@ -180,36 +166,15 @@ class S3FileManager(object):
             data = e.partial
         count = 0
         while data:
-            old_current_upload = file._current_upload
             resp = await file.appendData(data)
 
-            # The amount of bytes that are readed
-            readed_bytes = file._current_upload - old_current_upload + 1
+            try:
+                data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
+            except asyncio.IncompleteReadError as e:
+                data = e.partial
 
-            # Cut the data so there is only the needed data
-            data = data[readed_bytes:]
-
-            bytes_to_read = readed_bytes
-
-            if bytes_to_read == 0:
-                break
-            if len(data) < 262144:
-                break
-            if resp.status in [200, 201]:
-                file.finishUpload(self.context)
-            if resp.status in [400]:
-                break
-            if resp.status == 308:
-                count = 0
-                try:
-                    data += await self.request.content.readexactly(bytes_to_read)  # noqa
-                except asyncio.IncompleteReadError as e:
-                    data += e.partial
-
-            else:
-                count += 1
-                if count > MAX_RETRIES:
-                    raise AttributeError('MAX retries error')
+        if file._size <= file._current_upload:
+            file.finishUpload(self.context)
         expiration = file._resumable_uri_date + timedelta(days=7)
 
         resp = Response(headers=aiohttp.MultiDict({
@@ -248,20 +213,15 @@ class S3FileManager(object):
         }))
         resp.content_type = file.contentType
         resp.content_length = file._size
-        buf = BytesIO()
-        downloader = await file.download(buf)
+        downloader = await file.download(None)
         await resp.prepare(self.request)
         # response.start(request)
         done = False
-        while done is False:
-            status, done = downloader.next_chunk()
-            print("Download {}%.".format(int(status.progress() * 100)))
-            buf.seek(0)
-            data = buf.read()
+        buf = downloader['Body']
+        data = buf.read(CHUNK_SIZE)
+        while data:
             resp.write(data)
             await resp.drain()
-            buf.seek(0)
-            buf.truncate()
 
         return resp
 
@@ -296,26 +256,39 @@ class S3File(Persistent):
         util = getUtility(IS3BlobStore)
         request = get_current_request()
         if hasattr(self, '_upload_file_id') and self._upload_file_id is not None:  # noqa
-            req = util._service.objects().delete(
-                bucket=util.bucket, object=self._upload_file_id)
-            try:
-                req.execute()
-            except errors.HttpError:
-                pass
+            util._s3client.abort_multipart_upload(
+                Bucket=self._bucket_name,
+                Key=self._upload_file_id,
+                UploadId=self._mpu['UploadId'])
+            self._mpu = None
+            self._upload_file_id = None
 
+        bucket = util.bucket
+        self._bucket_name = bucket._name
         self._upload_file_id = request._site_id + '/' + uuid.uuid4().hex
-        self._mpu = util.bucket.initiate_multipart_upload(
-            self._upload_file_id)
+        self._multipart = {'Parts': []}
+        self._mpu = util._s3client.create_multipart_upload(
+            Bucket=self._bucket_name, Key=self._upload_file_id)
         self._current_upload = 0
-        self._block = 0
+        self._block = 1
         self._resumable_uri_date = datetime.now(tz=tzlocal())
         await notify(InitialS3Upload(context))
 
     async def appendData(self, data):
-
-        self._mpu.upload_part_from_file(data, self._block, cb=progress)
+        util = getUtility(IS3BlobStore)
+        part = util._s3client.upload_part(
+            Bucket=self._bucket_name,
+            Key=self._upload_file_id,
+            PartNumber=self._block,
+            UploadId=self._mpu['UploadId'],
+            Body=data)
+        self._multipart['Parts'].append({
+            'PartNumber': self._block,
+            'ETag': part['ETag']
+        })
+        self._current_upload += len(data)
         self._block += 1
-        return call
+        return part
 
     def actualSize(self):
         return self._current_upload
@@ -323,24 +296,32 @@ class S3File(Persistent):
     async def finishUpload(self, context):
         util = getUtility(IS3BlobStore)
         # It would be great to do on AfterCommit
-        # Delete the old file and update the new uri
         if hasattr(self, '_uri') and self._uri is not None:
-            req = util._service.objects().delete(
-                bucket=util.bucket, object=self._uri)
             try:
-                resp = req.execute()  # noqa
+                util._s3client.delete_object(
+                    Bucket=self._bucket_name,
+                    Key=self._uri)
             except errors.HttpError:
                 pass
         self._uri = self._upload_file_id
+        util._s3client.complete_multipart_upload(
+            Bucket=self._bucket_name,
+            Key=self._upload_file_id,
+            UploadId=self._mpu['UploadId'],
+            MultipartUpload=self._multipart)
+        self._multipart = None
+        self._block = None
         self._upload_file_id = None
         await notify(FinishS3Upload(context))
 
     async def deleteUpload(self):
         if hasattr(self, '_uri') and self._uri is not None:
-            req = util._service.objects().delete(
-                bucket=util.bucket, object=self._uri)
-            resp = req.execute()
-            return resp
+            try:
+                util._s3client.delete_object(
+                    Bucket=self._bucket_name,
+                    Key=self._uri)
+            except errors.HttpError:
+                pass
         else:
             raise AttributeError('No valid uri')
 
@@ -350,10 +331,11 @@ class S3File(Persistent):
             url = self._upload_file_id
         else:
             url = self._uri
-        req = util._service.objects().get_media(
-            bucket=util.bucket, object=url)
-        downloader = http.MediaIoBaseDownload(buf, req, chunksize=CHUNK_SIZE)
-        return downloader
+
+        req = util._s3client.get_object(
+            Bucket=self._bucket_name,
+            Key=url)
+        return req
 
     def _set_data(self, data):
         raise NotImplemented('Only specific upload permitted')
@@ -406,25 +388,37 @@ class S3FileField(Object):
 class S3BlobStore(object):
 
     def __init__(self, settings):
-        # self._aws_access_key = settings['AWS_ACCESS_KEY_ID']
-        # self._aws_secret_key = settings['AWS_SECRET_ACCESS_KEY']
-        # self._s3 = boto3.client(
-        #     's3',
-        #     aws_access_key_id=self._aws_access_key,
-        #     aws_secret_access_key=self._aws_secret_key
-        # )
+        self._aws_access_key = settings['aws_client_id']
+        self._aws_secret_key = settings['aws_client_secret']
+        self._s3client = boto3.client(
+            's3',
+            aws_access_key_id=self._aws_access_key,
+            aws_secret_access_key=self._aws_secret_key
+        )
         self._bucket_name = settings['bucket']
-        self._s3 = boto3.resource('s3')
+        self._s3 = boto3.resource(
+            's3',
+            aws_access_key_id=self._aws_access_key,
+            aws_secret_access_key=self._aws_secret_key
+        )
 
     @property
     def bucket(self):
         request = get_current_request()
-        if '.' in self._bucket:
-            char_delimiter = '.'
-        else:
-            char_delimiter = '_'
-        bucket_name = request._site_id.lower() + char_delimiter + self._bucket
-        bucket = self._s3.lookup(bucket_name)
+        bucket_name = request._site_id.lower() + '.' + self._bucket_name
+
+        bucket = self._s3.Bucket(bucket_name)
+        exists = True
+        try:
+            self._s3.meta.client.head_bucket(Bucket=bucket_name)
+        except botocore.exceptions.ClientError as e:
+            # If a client error is thrown, then check that it was a 404 error.
+            # If it was a 404 error, then the bucket does not exist.
+            error_code = int(e.response['Error']['Code'])
+            if error_code == 404:
+                exists = False
+                self._s3.create_bucket(Bucket=bucket_name)
+                bucket = s3.Bucket(bucket_name)
         return bucket
 
     async def initialize(self, app=None):
