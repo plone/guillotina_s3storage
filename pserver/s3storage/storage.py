@@ -96,6 +96,8 @@ class S3FileManager(object):
 
         if 'X-UPLOAD-FILENAME' in self.request.headers:
             file.filename = self.request.headers['X-UPLOAD-FILENAME']
+        elif 'X-UPLOAD-FILENAME-B64' in self.request.headers:
+            file.filename = base64.b64decode(self.request.headers['X-UPLOAD-FILENAME-B64']).decode("utf-8")    
         else:
             file.filename = uuid.uuid4().hex
 
