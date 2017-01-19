@@ -34,7 +34,7 @@ import base64
 from io import BytesIO
 
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('pserver.storage')
 
 MAX_SIZE = 1073741824
 
