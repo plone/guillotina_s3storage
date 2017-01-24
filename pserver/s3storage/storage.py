@@ -1,37 +1,41 @@
 # -*- coding: utf-8 -*-
 
-from zope.schema import Object
-from pserver.s3storage.interfaces import IS3File
-from pserver.s3storage.interfaces import IS3FileField
-from plone.server.interfaces import IAbsoluteURL
-from zope.interface import implementer
-from zope.component import getUtility
-from persistent import Persistent
-from zope.schema.fieldproperty import FieldProperty
-from zope.component import adapter
-from plone.server.interfaces import IResource
-from plone.server.interfaces import IRequest
-from plone.server.interfaces import IFileManager
-from pserver.s3storage.interfaces import IS3BlobStore
-from pserver.s3storage.events import InitialS3Upload
-from pserver.s3storage.events import FinishS3Upload
-from plone.server.json.interfaces import IValueToJson
-from plone.server.transactions import get_current_request
-from aiohttp.web import StreamResponse
-from plone.server.browser import Response
-from plone.server.events import notify
-from datetime import datetime
-from dateutil.tz import tzlocal
-from datetime import timedelta
-import logging
-import uuid
 import aiohttp
 import asyncio
+import base64
+import boto3
 import botocore
 import json
-import boto3
-import base64
+import logging
+import transaction
+import uuid
+
+from aiohttp.web import StreamResponse
+from datetime import datetime
+from datetime import timedelta
+from dateutil.tz import tzlocal
 from io import BytesIO
+from persistent import Persistent
+from plone.server.browser import Response
+from plone.server.events import notify
+from plone.server.interfaces import IAbsoluteURL
+from plone.server.interfaces import IFileManager
+from plone.server.interfaces import IRequest
+from plone.server.interfaces import IResource
+from plone.server.json.interfaces import IValueToJson
+from plone.server.transactions import RequestNotFound
+from plone.server.transactions import get_current_request
+from plone.server.transactions import tm
+from pserver.s3storage.events import FinishS3Upload
+from pserver.s3storage.events import InitialS3Upload
+from pserver.s3storage.interfaces import IS3BlobStore
+from pserver.s3storage.interfaces import IS3File
+from pserver.s3storage.interfaces import IS3FileField
+from zope.component import adapter
+from zope.component import getUtility
+from zope.interface import implementer
+from zope.schema import Object
+from zope.schema.fieldproperty import FieldProperty
 
 
 log = logging.getLogger('pserver.storage')
@@ -79,6 +83,11 @@ class S3FileManager(object):
         if file is None:
             file = S3File(contentType=self.request.content_type)
             self.field.set(self.context, file)
+            try:
+                trns = tm(self.request).get()
+            except RequestNotFound:
+                trns = transaction.get()
+            trns.savepoint()
         if 'X-UPLOAD-MD5HASH' in self.request.headers:
             file._md5hash = self.request.headers['X-UPLOAD-MD5HASH']
         else:
