@@ -36,6 +36,7 @@ from zope.component import getUtility
 from zope.interface import implementer
 from zope.schema import Object
 from zope.schema.fieldproperty import FieldProperty
+from plone.server import configure
 
 
 log = logging.getLogger('pserver.storage')
@@ -50,8 +51,9 @@ class S3Exception(Exception):
     pass
 
 
-@adapter(IS3File)
-@implementer(IValueToJson)
+@configure.adapter(
+    for_=IS3File,
+    provides=IValueToJson)
 def json_converter(value):
     if value is None:
         return value
@@ -65,8 +67,9 @@ def json_converter(value):
     }
 
 
-@adapter(IResource, IRequest, IS3FileField)
-@implementer(IFileManager)
+@configure.adapter(
+    for_=(IResource, IRequest, IS3FileField),
+    provides=IFileManager)
 class S3FileManager(object):
 
     def __init__(self, context, request, field):
