@@ -160,13 +160,14 @@ class S3FileManager(object):
             file.filename = uuid.uuid4().hex
         else:
             filename = self.request.headers['UPLOAD-METADATA']
-            file.filename = str(base64.b64decode(filename.split()[1]))
+            file.filename = base64.b64decode(filename.split()[1]).decode('utf-8')
 
         await file.initUpload(self.context)
         # Location will need to be adapted on aiohttp 1.1.x
         resp = Response(headers=aiohttp.MultiDict({
             'Location': IAbsoluteURL(self.context, self.request)() + '/@tusupload/' + self.field.__name__,  # noqa
-            'Tus-Resumable': '1.0.0'
+            'Tus-Resumable': '1.0.0',
+            'Access-Control-Expose-Headers': 'Location,Tus-Resumable'
         }), status=201)
         return resp
 
@@ -202,7 +203,8 @@ class S3FileManager(object):
         resp = Response(headers=aiohttp.MultiDict({
             'Upload-Offset': str(file.actualSize() + 1),
             'Tus-Resumable': '1.0.0',
-            'Upload-Expires': expiration.isoformat()
+            'Upload-Expires': expiration.isoformat(),
+            'Access-Control-Expose-Headers': 'Upload-Offset,Upload-Expires,Tus-Resumable'
         }))
         return resp
 
@@ -212,7 +214,8 @@ class S3FileManager(object):
             raise KeyError('No file on this context')
         resp = Response(headers=aiohttp.MultiDict({
             'Upload-Offset': str(file.actualSize()),
-            'Tus-Resumable': '1.0.0'
+            'Tus-Resumable': '1.0.0',
+            'Access-Control-Expose-Headers': 'Upload-Offset,Upload-Length,Tus-Resumable'
         }))
         return resp
 
