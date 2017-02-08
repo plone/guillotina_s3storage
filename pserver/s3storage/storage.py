@@ -22,6 +22,7 @@ from plone.server.interfaces import IAbsoluteURL
 from plone.server.interfaces import IFileManager
 from plone.server.interfaces import IRequest
 from plone.server.interfaces import IResource
+from plone.server.interfaces import IApplication
 from plone.server.json.interfaces import IValueToJson
 from plone.server.transactions import RequestNotFound
 from plone.server.transactions import get_current_request
@@ -326,7 +327,7 @@ class S3File(Persistent):
                 util._s3client.delete_object(
                     Bucket=self._bucket_name,
                     Key=self._uri)
-            except errors.HttpError:
+            except botocore.exceptions.ClientError as e:
                 pass
         self._uri = self._upload_file_id
         util._s3client.complete_multipart_upload(
@@ -340,12 +341,13 @@ class S3File(Persistent):
         await notify(FinishS3Upload(context))
 
     async def deleteUpload(self):
+        util = getUtility(IS3BlobStore)
         if hasattr(self, '_uri') and self._uri is not None:
             try:
                 util._s3client.delete_object(
                     Bucket=self._bucket_name,
                     Key=self._uri)
-            except errors.HttpError:
+            except botocore.exceptions.ClientError as e:
                 pass
         else:
             raise AttributeError('No valid uri')
@@ -356,8 +358,11 @@ class S3File(Persistent):
             url = self._upload_file_id
         else:
             url = self._uri
-
-        req = util._s3client.get_object(
+        loop = asyncio.get_event_loop()
+        executor = getUtility(IApplication, name='root').executor
+        req = await loop.run_in_executor(
+            executor,
+            util._s3client.get_object,
             Bucket=self._bucket_name,
             Key=url)
         return req
