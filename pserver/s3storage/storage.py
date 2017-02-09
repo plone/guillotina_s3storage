@@ -203,7 +203,7 @@ class S3FileManager(object):
         expiration = file._resumable_uri_date + timedelta(days=7)
 
         resp = Response(headers=aiohttp.MultiDict({
-            'Upload-Offset': str(file.actualSize() + 1),
+            'Upload-Offset': str(file.actualSize()),
             'Tus-Resumable': '1.0.0',
             'Upload-Expires': expiration.isoformat(),
             'Access-Control-Expose-Headers': 'Upload-Offset,Upload-Expires,Tus-Resumable'
