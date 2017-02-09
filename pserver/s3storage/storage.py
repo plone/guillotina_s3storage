@@ -234,21 +234,21 @@ class S3FileManager(object):
         file = self.field.get(self.context)
         if file is None:
             raise AttributeError('No field value')
-
         resp = StreamResponse(headers=aiohttp.MultiDict({
             'CONTENT-DISPOSITION': 'attachment; filename="%s"' % file.filename
         }))
         resp.content_type = file.contentType
+        resp.content_type = 'application/octet-stream'
         resp.content_length = file._size
         downloader = await file.download(None)
         await resp.prepare(self.request)
         # response.start(request)
-        done = False
         buf = downloader['Body']
         data = buf.read(CHUNK_SIZE)
         while data:
             resp.write(data)
             await resp.drain()
+            data = buf.read(CHUNK_SIZE)
 
         return resp
 
