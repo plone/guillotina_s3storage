@@ -38,6 +38,7 @@ from zope.interface import implementer
 from zope.schema import Object
 from zope.schema.fieldproperty import FieldProperty
 from plone.server import configure
+import functools
 
 
 log = logging.getLogger('pserver.storage')
@@ -359,12 +360,11 @@ class S3File(Persistent):
         else:
             url = self._uri
         loop = asyncio.get_event_loop()
+        operation = functools.partial(util._s3client.get_object, Bucket=self._bucket_name, Key=url)
         executor = getUtility(IApplication, name='root').executor
         req = await loop.run_in_executor(
             executor,
-            util._s3client.get_object,
-            Bucket=self._bucket_name,
-            Key=url)
+            operation)
         return req
 
     def _set_data(self, data):
