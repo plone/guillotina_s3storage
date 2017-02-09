@@ -197,9 +197,8 @@ class S3FileManager(object):
                 data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
             except asyncio.IncompleteReadError as e:
                 data = e.partial
-
         if file._size <= file._current_upload:
-            file.finishUpload(self.context)
+            await file.finishUpload(self.context)
         expiration = file._resumable_uri_date + timedelta(days=7)
 
         resp = Response(headers=aiohttp.MultiDict({
