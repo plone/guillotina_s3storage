@@ -166,6 +166,10 @@ class S3FileManager(object):
             file.filename = base64.b64decode(filename.split()[1]).decode('utf-8')
 
         await file.initUpload(self.context)
+        if file.size < MIN_UPLOAD_SIZE:
+            file._one_tus_shoot = True
+        else:
+            file._one_tus_shoot = False
         # Location will need to be adapted on aiohttp 1.1.x
         resp = Response(headers=aiohttp.MultiDict({
             'Location': IAbsoluteURL(self.context, self.request)() + '/@tusupload/' + self.field.__name__,  # noqa
@@ -190,17 +194,26 @@ class S3FileManager(object):
             data = await self.request.content.readexactly(to_upload)
         except asyncio.IncompleteReadError as e:
             data = e.partial
-        count = 0
-        while data:
-            resp = await file.appendData(data)
 
-            try:
-                data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
-            except asyncio.IncompleteReadError as e:
-                data = e.partial
-        if file._size <= file._current_upload:
-            await file.finishUpload(self.context)
-        expiration = file._resumable_uri_date + timedelta(days=7)
+        if file.one_tus_shoot:
+            # One time shoot
+            if file._block > 1:
+                raise AttributeError('You should push 5Mb blocks AWS')
+            await file.oneShotUpload(self.context, data)
+            expiration = datetime.now() + timedelta(days=365)
+        else:
+            count = 0
+            while data:
+                resp = await file.appendData(data)
+                count += 1
+
+                try:
+                    data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
+                except asyncio.IncompleteReadError as e:
+                    data = e.partial
+            if file._size <= file._current_upload:
+                await file.finishUpload(self.context)
+            expiration = file._resumable_uri_date + timedelta(days=7)
 
         resp = Response(headers=aiohttp.MultiDict({
             'Upload-Offset': str(file.actualSize()),
@@ -214,11 +227,14 @@ class S3FileManager(object):
         file = self.field.get(self.context)
         if file is None:
             raise KeyError('No file on this context')
-        resp = Response(headers=aiohttp.MultiDict({
+        head_response = {
             'Upload-Offset': str(file.actualSize()),
             'Tus-Resumable': '1.0.0',
             'Access-Control-Expose-Headers': 'Upload-Offset,Upload-Length,Tus-Resumable'
-        }))
+        }
+        if file.size:
+            head_response['Upload-Length'] = str(file._size)
+        resp = Response(headers=aiohttp.MultiDict(head_response))
         return resp
 
     async def tus_options(self):
@@ -341,6 +357,29 @@ class S3File(Persistent):
         self._upload_file_id = None
         await notify(FinishS3Upload(context))
 
+    async def oneShotUpload(self, context, data):
+        util = getUtility(IS3BlobStore)
+
+        if hasattr(self, '_upload_file_id') and self._upload_file_id is not None:  # noqa
+            util._s3client.abort_multipart_upload(
+                Bucket=self._bucket_name,
+                Key=self._upload_file_id,
+                UploadId=self._mpu['UploadId'])
+            self._mpu = None
+            self._upload_file_id = None
+        file_data = BytesIO(data)
+        bucket = util.bucket
+        self._bucket_name = bucket._name
+        request = get_current_request()
+        self._upload_file_id = request._site_id + '/' + uuid.uuid4().hex
+        response = util._s3client.upload_fileobj(
+            file_data,
+            self._bucket_name,
+            self._upload_file_id)
+        self._block += 1
+        self._current_upload += len(data)
+        return response
+
     async def deleteUpload(self):
         util = getUtility(IS3BlobStore)
         if hasattr(self, '_uri') and self._uri is not None:
@@ -395,6 +434,13 @@ class S3File(Persistent):
             return self._extension
         else:
             return None
+
+    @property
+    def one_tus_shoot(self):
+        if hasattr(self, '_one_tus_shoot'):
+            return self._one_tus_shoot
+        else:
+            return False
 
     def getSize(self):  # noqa
         return self.size
