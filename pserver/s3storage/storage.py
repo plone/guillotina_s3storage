@@ -45,7 +45,8 @@ log = logging.getLogger('pserver.storage')
 
 MAX_SIZE = 1073741824
 
-CHUNK_SIZE = 524288
+MIN_UPLOAD_SIZE = 5 * 1024 * 1024
+CHUNK_SIZE = MIN_UPLOAD_SIZE
 MAX_RETRIES = 5
 
 
