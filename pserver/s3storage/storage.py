@@ -136,6 +136,11 @@ class S3FileManager(object):
         await file.finishUpload(self.context)
 
     async def tus_create(self):
+
+        # This only happens in tus-java-client, redirect this POST to a PATCH
+        if self.request.headers.get('X-HTTP-Method-Override') == 'PATCH':
+            return await self.tus_patch()
+
         file = self.field.get(self.context)
         if file is None:
             file = S3File(contentType=self.request.content_type)
