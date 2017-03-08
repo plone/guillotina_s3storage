@@ -26,6 +26,7 @@ setup(
         'plone.server',
         'boto3',
         'ujson',
+        'aiobotocore'
     ],
     tests_require=[
         'pytest',
