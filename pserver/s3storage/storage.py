@@ -3,8 +3,9 @@
 import aiohttp
 import asyncio
 import base64
-import boto3
 import botocore
+import boto3
+import aiobotocore
 import json
 import logging
 import transaction
@@ -251,6 +252,7 @@ class S3FileManager(object):
         }))
         return resp
 
+
     async def download(self):
         file = self.field.get(self.context)
         if file is None:
@@ -261,15 +263,17 @@ class S3FileManager(object):
         resp.content_type = file.contentType
         resp.content_type = 'application/octet-stream'
         resp.content_length = file._size
+
         downloader = await file.download(None)
         await resp.prepare(self.request)
-        # response.start(request)
-        buf = downloader['Body']
-        data = buf.read(CHUNK_SIZE)
-        while data:
-            resp.write(data)
-            await resp.drain()
-            data = buf.read(CHUNK_SIZE)
+        resp.start(self.request)
+
+        async with downloader['Body'] as stream:
+            data = await stream.read(CHUNK_SIZE)
+
+            while data:
+                resp.write(data)
+                data = await stream.read(CHUNK_SIZE)
 
         return resp
 
@@ -403,13 +407,9 @@ class S3File(Persistent):
             url = self._upload_file_id
         else:
             url = self._uri
-        loop = asyncio.get_event_loop()
-        operation = functools.partial(util._s3client.get_object, Bucket=self._bucket_name, Key=url)
-        executor = getUtility(IApplication, name='root').executor
-        req = await loop.run_in_executor(
-            executor,
-            operation)
-        return req
+
+        downloader = await util._s3aioclient.get_object(Bucket=self._bucket_name, Key=url)
+        return downloader
 
     def _set_data(self, data):
         raise NotImplemented('Only specific upload permitted')
@@ -471,12 +471,23 @@ class S3BlobStore(object):
     def __init__(self, settings):
         self._aws_access_key = settings['aws_client_id']
         self._aws_secret_key = settings['aws_client_secret']
+
+        loop = asyncio.get_event_loop()
+        self.session = aiobotocore.get_session(loop=loop)
+
+        # This client is for downloads only
+        self._s3aioclient = self.session.create_client('s3',
+                              aws_secret_access_key=self._aws_secret_key,
+                              aws_access_key_id=self._aws_access_key)
+
+        self._bucket_name = settings['bucket']
+
         self._s3client = boto3.client(
             's3',
             aws_access_key_id=self._aws_access_key,
             aws_secret_access_key=self._aws_secret_key
         )
-        self._bucket_name = settings['bucket']
+
         self._s3 = boto3.resource(
             's3',
             aws_access_key_id=self._aws_access_key,
