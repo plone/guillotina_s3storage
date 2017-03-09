@@ -124,10 +124,12 @@ class S3FileManager(object):
             data = e.partial
 
         count = 0
-        while data:
+
+        # If we have data or is an empty file
+        while data or (len(data) == 0 and count == 0):
             old_current_upload = file._current_upload
             resp = await file.appendData(data)
-
+            count +=1
             try:
                 data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
             except asyncio.IncompleteReadError as e:
