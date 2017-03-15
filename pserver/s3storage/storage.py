@@ -202,7 +202,6 @@ class S3FileManager(object):
             data = await self.request.content.readexactly(to_upload)
         except asyncio.IncompleteReadError as e:
             data = e.partial
-
         if file.one_tus_shoot:
             # One time shoot
             if file._block > 1:
@@ -219,10 +218,10 @@ class S3FileManager(object):
                     data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
                 except asyncio.IncompleteReadError as e:
                     data = e.partial
-            if file._size <= file._current_upload:
-                await file.finishUpload(self.context)
-            expiration = file._resumable_uri_date + timedelta(days=7)
 
+            expiration = file._resumable_uri_date + timedelta(days=7)
+        if file._size <= file._current_upload:
+            await file.finishUpload(self.context)
         resp = Response(headers=aiohttp.MultiDict({
             'Upload-Offset': str(file.actualSize()),
             'Tus-Resumable': '1.0.0',
@@ -358,11 +357,12 @@ class S3File(Persistent):
             except botocore.exceptions.ClientError as e:
                 pass
         self._uri = self._upload_file_id
-        util._s3client.complete_multipart_upload(
-            Bucket=self._bucket_name,
-            Key=self._upload_file_id,
-            UploadId=self._mpu['UploadId'],
-            MultipartUpload=self._multipart)
+        if self._mpu is not None:
+            util._s3client.complete_multipart_upload(
+                Bucket=self._bucket_name,
+                Key=self._upload_file_id,
+                UploadId=self._mpu['UploadId'],
+                MultipartUpload=self._multipart)
         self._multipart = None
         self._block = None
         self._upload_file_id = None
