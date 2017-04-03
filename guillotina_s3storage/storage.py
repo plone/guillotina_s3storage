@@ -1,45 +1,41 @@
 # -*- coding: utf-8 -*-
 
-import aiohttp
-import asyncio
-import base64
-import botocore
-import boto3
-import aiobotocore
-import json
-import logging
-import transaction
-import uuid
-
 from aiohttp.web import StreamResponse
 from datetime import datetime
 from datetime import timedelta
 from dateutil.tz import tzlocal
+from guillotina import configure
+from guillotina.browser import Response
+from guillotina.component import getUtility
+from guillotina.events import notify
+from guillotina.interfaces import IAbsoluteURL
+from guillotina.interfaces import IFileManager
+from guillotina.interfaces import IRequest
+from guillotina.interfaces import IResource
+from guillotina.json.interfaces import IValueToJson
+from guillotina.schema import Object
+from guillotina.schema.fieldproperty import FieldProperty
+from guillotina.transactions import get_current_request
+from guillotina.transactions import RequestNotFound
+from guillotina.transactions import tm
+from guillotina_s3storage.events import FinishS3Upload
+from guillotina_s3storage.events import InitialS3Upload
+from guillotina_s3storage.interfaces import IS3BlobStore
+from guillotina_s3storage.interfaces import IS3File
+from guillotina_s3storage.interfaces import IS3FileField
 from io import BytesIO
 from persistent import Persistent
-from plone.server.browser import Response
-from plone.server.events import notify
-from plone.server.interfaces import IAbsoluteURL
-from plone.server.interfaces import IFileManager
-from plone.server.interfaces import IRequest
-from plone.server.interfaces import IResource
-from plone.server.interfaces import IApplication
-from plone.server.json.interfaces import IValueToJson
-from plone.server.transactions import RequestNotFound
-from plone.server.transactions import get_current_request
-from plone.server.transactions import tm
-from pserver.s3storage.events import FinishS3Upload
-from pserver.s3storage.events import InitialS3Upload
-from pserver.s3storage.interfaces import IS3BlobStore
-from pserver.s3storage.interfaces import IS3File
-from pserver.s3storage.interfaces import IS3FileField
-from zope.component import adapter
-from zope.component import getUtility
 from zope.interface import implementer
-from zope.schema import Object
-from zope.schema.fieldproperty import FieldProperty
-from plone.server import configure
-import functools
+
+import aiobotocore
+import aiohttp
+import asyncio
+import base64
+import boto3
+import botocore
+import logging
+import transaction
+import uuid
 
 
 log = logging.getLogger('pserver.storage')
@@ -113,7 +109,8 @@ class S3FileManager(object):
         if 'X-UPLOAD-FILENAME' in self.request.headers:
             file.filename = self.request.headers['X-UPLOAD-FILENAME']
         elif 'X-UPLOAD-FILENAME-B64' in self.request.headers:
-            file.filename = base64.b64decode(self.request.headers['X-UPLOAD-FILENAME-B64']).decode("utf-8")    
+            file.filename = base64.b64decode(
+                self.request.headers['X-UPLOAD-FILENAME-B64']).decode("utf-8")
         else:
             file.filename = uuid.uuid4().hex
 
@@ -180,7 +177,8 @@ class S3FileManager(object):
             file._one_tus_shoot = False
         # Location will need to be adapted on aiohttp 1.1.x
         resp = Response(headers=aiohttp.MultiDict({
-            'Location': IAbsoluteURL(self.context, self.request)() + '/@tusupload/' + self.field.__name__,  # noqa
+            'Location': IAbsoluteURL(
+                self.context, self.request)() + '/@tusupload/' + self.field.__name__,
             'Tus-Resumable': '1.0.0',
             'Access-Control-Expose-Headers': 'Location,Tus-Resumable'
         }), status=201)

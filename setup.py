@@ -3,7 +3,7 @@ from setuptools import find_packages
 from setuptools import setup
 
 setup(
-    name='pserver.s3storage',
+    name='guillotina_s3storage',
     version=open('VERSION').read().strip(),
     long_description=(open('README.rst').read() + '\n' +
                       open('CHANGELOG.rst').read()),
@@ -12,7 +12,7 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
-    url='https://pypi.python.org/pypi/pserver.s3storage',
+    url='https://pypi.python.org/pypi/guillotina_s3storage',
     license='GPL version 3',
     setup_requires=[
         'pytest-runner',
@@ -20,10 +20,9 @@ setup(
     zip_safe=True,
     include_package_data=True,
     packages=find_packages(exclude=['ez_setup']),
-    namespace_packages=['pserver'],
     install_requires=[
         'setuptools',
-        'plone.server',
+        'guillotina',
         'boto3',
         'ujson',
         'aiobotocore'
@@ -32,8 +31,8 @@ setup(
         'pytest',
     ],
     entry_points={
-        'plone.server': [
-            'include = pserver.s3storage',
+        'guillotina': [
+            'include = guillotina_s3storage',
         ]
     }
 )

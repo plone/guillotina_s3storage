@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
+from guillotina.interfaces import IFile
+from guillotina.interfaces import IFileField
+from guillotina.interfaces import IFileFinishUploaded
 from zope.interface import Interface
-from plone.server.interfaces import IFileField
-from plone.server.interfaces.events import IFileFinishUploaded
 from zope.interface import interfaces
-from plone.server.interfaces import IFile
 
 
 class IS3FileField(IFileField):
