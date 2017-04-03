@@ -7,24 +7,22 @@ from dateutil.tz import tzlocal
 from guillotina import configure
 from guillotina.browser import Response
 from guillotina.component import getUtility
-from guillotina.events import notify
+from guillotina.db.orm.base import BaseObject
+from guillotina.event import notify
 from guillotina.interfaces import IAbsoluteURL
 from guillotina.interfaces import IFileManager
 from guillotina.interfaces import IRequest
 from guillotina.interfaces import IResource
-from guillotina.json.interfaces import IValueToJson
+from guillotina.interfaces import IValueToJson
 from guillotina.schema import Object
 from guillotina.schema.fieldproperty import FieldProperty
-from guillotina.transactions import get_current_request
-from guillotina.transactions import RequestNotFound
-from guillotina.transactions import tm
+from guillotina.utils import get_current_request
 from guillotina_s3storage.events import FinishS3Upload
 from guillotina_s3storage.events import InitialS3Upload
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.interfaces import IS3File
 from guillotina_s3storage.interfaces import IS3FileField
 from io import BytesIO
-from persistent import Persistent
 from zope.interface import implementer
 
 import aiobotocore
@@ -34,7 +32,6 @@ import base64
 import boto3
 import botocore
 import logging
-import transaction
 import uuid
 
 
@@ -86,11 +83,9 @@ class S3FileManager(object):
         if file is None:
             file = S3File(contentType=self.request.content_type)
             self.field.set(self.context, file)
-            try:
-                trns = tm(self.request).get()
-            except RequestNotFound:
-                trns = transaction.get()
-            trns.savepoint()
+            # XXX no savepoint support right now?
+            # trns = get_transaction(self.request)
+            # trns.savepoint()
         if 'X-UPLOAD-MD5HASH' in self.request.headers:
             file._md5hash = self.request.headers['X-UPLOAD-MD5HASH']
         else:
@@ -251,7 +246,6 @@ class S3FileManager(object):
         }))
         return resp
 
-
     async def download(self):
         file = self.field.get(self.context)
         if file is None:
@@ -278,7 +272,7 @@ class S3FileManager(object):
 
 
 @implementer(IS3File)
-class S3File(Persistent):
+class S3File(BaseObject):
     """File stored in a GCloud, with a filename."""
 
     filename = FieldProperty(IS3File['filename'])

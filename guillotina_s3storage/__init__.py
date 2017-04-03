@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-from guillotina import app_settings
 from guillotina import configure
 
 
-app_settings {
+app_settings = {
     'cloud_storage': "guillotina_s3storage.interfaces.IS3FileField"
 }
 

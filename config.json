@@ -4,5 +4,6 @@
     "settings": {
         "json_credentials": "XXXX.json",
         "bucket": "XXX-bucket"
-    }
+    },
+    "applications": ["guillotina_s3storage"]
 }
