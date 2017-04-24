@@ -1,0 +1,4 @@
+include *.json
+include *.rst
+include VERSION
+include buildout.cfg

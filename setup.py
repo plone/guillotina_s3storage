@@ -4,14 +4,17 @@ from setuptools import setup
 
 setup(
     name='guillotina_s3storage',
+    description='s3 guillotina storage support',
     version=open('VERSION').read().strip(),
     long_description=(open('README.rst').read() + '\n' +
                       open('CHANGELOG.rst').read()),
     classifiers=[
-        'Framework :: Plone :: 7.0',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
+    author='Ramon Navarro Bosch',
+    author_email='ramon@plone.org',
+    keywords='async aiohtt guillotina s3',
     url='https://pypi.python.org/pypi/guillotina_s3storage',
     license='GPL version 3',
     setup_requires=[
@@ -29,10 +32,5 @@ setup(
     ],
     tests_require=[
         'pytest',
-    ],
-    entry_points={
-        'guillotina': [
-            'include = guillotina_s3storage',
-        ]
-    }
+    ]
 )

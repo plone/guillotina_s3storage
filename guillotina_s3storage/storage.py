@@ -121,7 +121,7 @@ class S3FileManager(object):
         while data or (len(data) == 0 and count == 0):
             old_current_upload = file._current_upload
             resp = await file.appendData(data)
-            count +=1
+            count += 1
             try:
                 data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
             except asyncio.IncompleteReadError as e:
@@ -310,7 +310,7 @@ class S3File(BaseObject):
 
         bucket = util.bucket
         self._bucket_name = bucket._name
-        self._upload_file_id = request._site_id + '/' + uuid.uuid4().hex
+        self._upload_file_id = request._container_id + '/' + uuid.uuid4().hex
         self._multipart = {'Parts': []}
         self._mpu = util._s3client.create_multipart_upload(
             Bucket=self._bucket_name, Key=self._upload_file_id)
@@ -374,7 +374,7 @@ class S3File(BaseObject):
         bucket = util.bucket
         self._bucket_name = bucket._name
         request = get_current_request()
-        self._upload_file_id = request._site_id + '/' + uuid.uuid4().hex
+        self._upload_file_id = request._container_id + '/' + uuid.uuid4().hex
         response = util._s3client.upload_fileobj(
             file_data,
             self._bucket_name,
@@ -470,9 +470,10 @@ class S3BlobStore(object):
         self.session = aiobotocore.get_session(loop=loop)
 
         # This client is for downloads only
-        self._s3aioclient = self.session.create_client('s3',
-                              aws_secret_access_key=self._aws_secret_key,
-                              aws_access_key_id=self._aws_access_key)
+        self._s3aioclient = self.session.create_client(
+            's3',
+            aws_secret_access_key=self._aws_secret_key,
+            aws_access_key_id=self._aws_access_key)
 
         self._bucket_name = settings['bucket']
 
@@ -491,10 +492,9 @@ class S3BlobStore(object):
     @property
     def bucket(self):
         request = get_current_request()
-        bucket_name = request._site_id.lower() + '.' + self._bucket_name
+        bucket_name = request._container_id.lower() + '.' + self._bucket_name
 
         bucket = self._s3.Bucket(bucket_name)
-        exists = True
         try:
             self._s3.meta.client.head_bucket(Bucket=bucket_name)
         except botocore.exceptions.ClientError as e:
@@ -502,9 +502,8 @@ class S3BlobStore(object):
             # If it was a 404 error, then the bucket does not exist.
             error_code = int(e.response['Error']['Code'])
             if error_code == 404:
-                exists = False
                 self._s3.create_bucket(Bucket=bucket_name)
-                bucket = s3.Bucket(bucket_name)
+                bucket = self._s3.Bucket(bucket_name)
         return bucket
 
     async def initialize(self, app=None):
