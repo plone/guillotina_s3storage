@@ -57,7 +57,7 @@ def json_converter(value):
 
     return {
         'filename': value.filename,
-        'contenttype': value.contentType,
+        'contenttype': value.content_type,
         'size': value.size,
         'extension': value.extension,
         'md5': value.md5
@@ -81,7 +81,7 @@ class S3FileManager(object):
         """
         file = self.field.get(self.context)
         if file is None:
-            file = S3File(contentType=self.request.content_type)
+            file = S3File(content_type=self.request.content_type)
             self.field.set(self.context, file)
             # XXX no savepoint support right now?
             # trns = get_transaction(self.request)
@@ -138,7 +138,7 @@ class S3FileManager(object):
 
         file = self.field.get(self.context)
         if file is None:
-            file = S3File(contentType=self.request.content_type)
+            file = S3File(content_type=self.request.content_type)
             self.field.set(self.context, file)
         if 'CONTENT-LENGTH' in self.request.headers:
             file._current_upload = int(self.request.headers['CONTENT-LENGTH'])
@@ -171,12 +171,12 @@ class S3FileManager(object):
         else:
             file._one_tus_shoot = False
         # Location will need to be adapted on aiohttp 1.1.x
-        resp = Response(headers=aiohttp.MultiDict({
+        resp = Response(headers={
             'Location': IAbsoluteURL(
                 self.context, self.request)() + '/@tusupload/' + self.field.__name__,
             'Tus-Resumable': '1.0.0',
             'Access-Control-Expose-Headers': 'Location,Tus-Resumable'
-        }), status=201)
+        }, status=201)
         return resp
 
     async def tus_patch(self):
@@ -215,12 +215,12 @@ class S3FileManager(object):
             expiration = file._resumable_uri_date + timedelta(days=7)
         if file._size <= file._current_upload:
             await file.finishUpload(self.context)
-        resp = Response(headers=aiohttp.MultiDict({
+        resp = Response(headers={
             'Upload-Offset': str(file.actualSize()),
             'Tus-Resumable': '1.0.0',
             'Upload-Expires': expiration.isoformat(),
             'Access-Control-Expose-Headers': 'Upload-Offset,Upload-Expires,Tus-Resumable'
-        }))
+        })
         return resp
 
     async def tus_head(self):
@@ -234,32 +234,31 @@ class S3FileManager(object):
         }
         if file.size:
             head_response['Upload-Length'] = str(file._size)
-        resp = Response(headers=aiohttp.MultiDict(head_response))
+        resp = Response(headers=head_response)
         return resp
 
     async def tus_options(self):
-        resp = Response(headers=aiohttp.MultiDict({
+        resp = Response(headers={
             'Tus-Resumable': '1.0.0',
             'Tus-Version': '1.0.0',
             'Tus-Max-Size': '1073741824',
             'Tus-Extension': 'creation,expiration'
-        }))
+        })
         return resp
 
     async def download(self):
         file = self.field.get(self.context)
         if file is None:
             raise AttributeError('No field value')
-        resp = StreamResponse(headers=aiohttp.MultiDict({
+        resp = StreamResponse(headers={
             'CONTENT-DISPOSITION': 'attachment; filename="%s"' % file.filename
-        }))
-        resp.content_type = file.contentType
+        })
+        resp.content_type = file.content_type
         resp.content_type = 'application/octet-stream'
         resp.content_length = file._size
 
         downloader = await file.download(None)
         await resp.prepare(self.request)
-        resp.start(self.request)
 
         async with downloader['Body'] as stream:
             data = await stream.read(CHUNK_SIZE)
@@ -279,9 +278,9 @@ class S3File(BaseObject):
 
     def __init__(  # noqa
             self,
-            contentType='application/octet-stream',
+            content_ype='application/octet-stream',
             filename=None):
-        self.contentType = contentType
+        self.content_type = content_type
         self._current_upload = 0
         if filename is not None:
             self.filename = filename
