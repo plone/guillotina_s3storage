@@ -1,4 +1,4 @@
-1.0.2 (unreleased)
+1.0.2 (2017-04-26)
 ------------------
 
 - utility needs to be able to take loop param
