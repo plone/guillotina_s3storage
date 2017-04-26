@@ -1,7 +1,8 @@
 1.0.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- utility needs to be able to take loop param
+  [vangheem]
 
 
 1.0.1 (2017-04-25)

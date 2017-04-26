@@ -26,7 +26,6 @@ from io import BytesIO
 from zope.interface import implementer
 
 import aiobotocore
-import aiohttp
 import asyncio
 import base64
 import boto3
@@ -119,8 +118,8 @@ class S3FileManager(object):
 
         # If we have data or is an empty file
         while data or (len(data) == 0 and count == 0):
-            old_current_upload = file._current_upload
-            resp = await file.appendData(data)
+            old_current_upload = file._current_upload  # noqa
+            await file.appendData(data)
             count += 1
             try:
                 data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
@@ -278,7 +277,7 @@ class S3File(BaseObject):
 
     def __init__(  # noqa
             self,
-            content_ype='application/octet-stream',
+            content_type='application/octet-stream',
             filename=None):
         self.content_type = content_type
         self._current_upload = 0
@@ -461,7 +460,7 @@ class S3FileField(Object):
 
 class S3BlobStore(object):
 
-    def __init__(self, settings):
+    def __init__(self, settings, loop=None):
         self._aws_access_key = settings['aws_client_id']
         self._aws_secret_key = settings['aws_client_secret']
 
