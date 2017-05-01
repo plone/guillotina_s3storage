@@ -56,7 +56,7 @@ def json_converter(value):
 
     return {
         'filename': value.filename,
-        'contenttype': value.content_type,
+        'content_type': value.content_type,
         'size': value.size,
         'extension': value.extension,
         'md5': value.md5
@@ -275,19 +275,21 @@ class S3File(BaseObject):
 
     filename = FieldProperty(IS3File['filename'])
 
-    def __init__(  # noqa
-            self,
-            content_type='application/octet-stream',
-            filename=None):
+    def __init__(self, content_type='application/octet-stream',
+                 filename=None, size=0, md5=None):
+        if not isinstance(content_type, bytes):
+            content_type = content_type.encode('utf8')
         self.content_type = content_type
-        self._current_upload = 0
         if filename is not None:
             self.filename = filename
             extension_discovery = filename.split('.')
             if len(extension_discovery) > 1:
                 self._extension = extension_discovery[-1]
-        elif self.filename is not None:
+        elif self.filename is None:
             self.filename = uuid.uuid4().hex
+
+        self._size = size
+        self._md5 = md5
 
     async def initUpload(self, context):
         """Init an upload.
@@ -438,9 +440,6 @@ class S3File(BaseObject):
             return self._one_tus_shoot
         else:
             return False
-
-    def getSize(self):  # noqa
-        return self.size
 
 
 @implementer(IS3FileField)

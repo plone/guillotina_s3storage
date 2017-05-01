@@ -1,7 +1,8 @@
 1.0.3 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- S3File can take more all arguments in constructor now
+  [vangheem]
 
 
 1.0.2 (2017-04-26)
