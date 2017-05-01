@@ -1,4 +1,4 @@
-1.0.3 (unreleased)
+1.0.3 (2017-05-01)
 ------------------
 
 - S3File can take more all arguments in constructor now
