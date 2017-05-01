@@ -1,7 +1,8 @@
 1.0.4 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Do not inherit from BaseObject
+  [vangheem]
 
 
 1.0.3 (2017-05-01)

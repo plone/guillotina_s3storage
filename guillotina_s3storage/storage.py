@@ -7,7 +7,6 @@ from dateutil.tz import tzlocal
 from guillotina import configure
 from guillotina.browser import Response
 from guillotina.component import getUtility
-from guillotina.db.orm.base import BaseObject
 from guillotina.event import notify
 from guillotina.interfaces import IAbsoluteURL
 from guillotina.interfaces import IFileManager
@@ -270,7 +269,7 @@ class S3FileManager(object):
 
 
 @implementer(IS3File)
-class S3File(BaseObject):
+class S3File:
     """File stored in a GCloud, with a filename."""
 
     filename = FieldProperty(IS3File['filename'])
