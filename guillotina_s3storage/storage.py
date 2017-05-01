@@ -88,9 +88,9 @@ class S3FileManager(object):
             # trns = get_transaction(self.request)
             # trns.savepoint()
         if 'X-UPLOAD-MD5HASH' in self.request.headers:
-            file._md5hash = self.request.headers['X-UPLOAD-MD5HASH']
+            file._md5 = self.request.headers['X-UPLOAD-MD5HASH']
         else:
-            file._md5hash = None
+            file._md5 = None
 
         if 'X-UPLOAD-EXTENSION' in self.request.headers:
             file._extension = self.request.headers['X-UPLOAD-EXTENSION']
@@ -152,7 +152,7 @@ class S3FileManager(object):
             raise AttributeError('We need upload-length header')
 
         if 'UPLOAD-MD5' in self.request.headers:
-            file._md5hash = self.request.headers['UPLOAD-MD5']
+            file._md5 = self.request.headers['UPLOAD-MD5']
 
         if 'UPLOAD-EXTENSION' in self.request.headers:
             file._extension = self.request.headers['UPLOAD-EXTENSION']
@@ -424,8 +424,8 @@ class S3File:
 
     @property
     def md5(self):
-        if hasattr(self, '_md5hash'):
-            return self._md5hash
+        if hasattr(self, '_md5'):
+            return self._md5
         else:
             return None
 
