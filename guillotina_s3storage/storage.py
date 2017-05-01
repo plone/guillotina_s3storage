@@ -53,9 +53,12 @@ def json_converter(value):
     if value is None:
         return value
 
+    ct = value.content_type
+    if isinstance(ct, bytes):
+        ct = ct.decode('utf-8')
     return {
         'filename': value.filename,
-        'content_type': value.content_type,
+        'content_type': ct,
         'size': value.size,
         'extension': value.extension,
         'md5': value.md5
