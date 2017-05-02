@@ -1,7 +1,8 @@
 1.0.7 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Make sure to write to object when uploading
+  [vangheem]
 
 
 1.0.6 (2017-05-01)
