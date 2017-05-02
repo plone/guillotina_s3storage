@@ -1,4 +1,4 @@
-1.0.7 (unreleased)
+1.0.7 (2017-05-02)
 ------------------
 
 - Make sure to write to object when uploading
