@@ -6,3 +6,4 @@ lib
 include
 extras
 pip-selfcheck.json
+.idea
