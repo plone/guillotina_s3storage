@@ -1,7 +1,14 @@
 1.0.8 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Provide iterate_bucket method
+  [vangheem]
+
+- provide method to rename object
+  [vangheem]
+
+- Use keys that use the object's oid
+  [vangheem]
 
 
 1.0.7 (2017-05-02)

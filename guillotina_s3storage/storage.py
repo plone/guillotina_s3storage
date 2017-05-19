@@ -15,6 +15,7 @@ from guillotina.interfaces import IResource
 from guillotina.interfaces import IValueToJson
 from guillotina.schema import Object
 from guillotina.schema.fieldproperty import FieldProperty
+from guillotina.utils import get_content_path
 from guillotina.utils import get_current_request
 from guillotina_s3storage.events import FinishS3Upload
 from guillotina_s3storage.events import InitialS3Upload
@@ -298,6 +299,23 @@ class S3File:
         self._size = size
         self._md5 = md5
 
+    def generate_key(self, request, context):
+        return '{}{}/{}::{}'.format(
+            request._container_id,
+            get_content_path(context),
+            context._p_oid,
+            uuid.uuid4().hex)
+
+    async def rename_cloud_file(self, new_uri):
+        if self.uri is None:
+            Exception('To rename a uri must be set on the object')
+        util = getUtility(IS3BlobStore)
+
+        util._s3client.copy({'Bucket':self._bucket_name, 'Key': self.uri},
+                            self._bucket_name, new_uri)
+        util._s3client.delete_object(Bucket=self._bucket_name, Key=self.uri)
+        self._uri = new_uri
+
     async def initUpload(self, context):
         """Init an upload.
 
@@ -317,7 +335,7 @@ class S3File:
 
         bucket = util.bucket
         self._bucket_name = bucket._name
-        self._upload_file_id = request._container_id + '/' + uuid.uuid4().hex
+        self._upload_file_id = self.generate_key(request, context)
         self._multipart = {'Parts': []}
         self._mpu = util._s3client.create_multipart_upload(
             Bucket=self._bucket_name, Key=self._upload_file_id)
@@ -348,13 +366,13 @@ class S3File:
     async def finishUpload(self, context):
         util = getUtility(IS3BlobStore)
         # It would be great to do on AfterCommit
-        if hasattr(self, '_uri') and self._uri is not None:
+        if self.uri is not None:
             try:
                 util._s3client.delete_object(
                     Bucket=self._bucket_name,
-                    Key=self._uri)
+                    Key=self.uri)
             except botocore.exceptions.ClientError as e:
-                pass
+                log.warn('Error deleting object', exc_info=True)
         self._uri = self._upload_file_id
         if self._mpu is not None:
             util._s3client.complete_multipart_upload(
@@ -390,15 +408,17 @@ class S3File:
         self._current_upload += len(data)
         return response
 
-    async def deleteUpload(self):
+    async def deleteUpload(self, uri=None):
         util = getUtility(IS3BlobStore)
-        if hasattr(self, '_uri') and self._uri is not None:
+        if uri is None:
+            uri = self.uri
+        if uri is not None:
             try:
                 util._s3client.delete_object(
                     Bucket=self._bucket_name,
-                    Key=self._uri)
+                    Key=uri)
             except botocore.exceptions.ClientError as e:
-                pass
+                log.warn('Error deleting object', exc_info=True)
         else:
             raise AttributeError('No valid uri')
 
@@ -419,6 +439,11 @@ class S3File:
         raise NotImplemented('Only specific download permitted')
 
     data = property(_get_data, _set_data)
+
+    @property
+    def uri(self):
+        if hasattr(self, '_uri'):
+            return self._uri
 
     @property
     def size(self):
@@ -470,7 +495,8 @@ class S3BlobStore(object):
         self._aws_access_key = settings['aws_client_id']
         self._aws_secret_key = settings['aws_client_secret']
 
-        loop = asyncio.get_event_loop()
+        if loop is None:
+            loop = asyncio.get_event_loop()
         self.session = aiobotocore.get_session(loop=loop)
 
         # This client is for downloads only
@@ -493,10 +519,13 @@ class S3BlobStore(object):
             aws_secret_access_key=self._aws_secret_key
         )
 
+    def get_bucket_name(self):
+        request = get_current_request()
+        return request._container_id.lower() + '.' + self._bucket_name
+
     @property
     def bucket(self):
-        request = get_current_request()
-        bucket_name = request._container_id.lower() + '.' + self._bucket_name
+        bucket_name = self.get_bucket_name()
 
         bucket = self._s3.Bucket(bucket_name)
         try:
@@ -513,3 +542,11 @@ class S3BlobStore(object):
     async def initialize(self, app=None):
         # No asyncio loop to run
         self.app = app
+
+    async def finalize(self, app=None):
+        self.session.close()
+
+    async def iterate_bucket(self):
+        req = get_current_request()
+        for item in self.bucket.objects.filter(Prefix=req._container_id + '/'):
+            yield item
