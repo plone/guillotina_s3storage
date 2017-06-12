@@ -2,8 +2,10 @@ from guillotina.component import getUtility
 from guillotina.tests.utils import create_content
 from guillotina.tests.utils import login
 from guillotina_s3storage.interfaces import IS3BlobStore
+from guillotina_s3storage.storage import CHUNK_SIZE
+from guillotina_s3storage.storage import S3File
 from guillotina_s3storage.storage import S3FileField
-from guillotina_s3storage.storage import S3FileManager, S3File
+from guillotina_s3storage.storage import S3FileManager
 from hashlib import md5
 from zope.interface import Interface
 
@@ -14,13 +16,18 @@ _test_gif = base64.b64decode('R0lGODlhPQBEAPeoAJosM//AwO/AwHVYZ/z595kzAP/s7P+goO
 
 
 class FakeContentReader:
-    _read = False
+
+    def __init__(self, file_data=_test_gif):
+        self._file_data = file_data
+        self._pointer = 0
 
     async def readexactly(self, size):
-        if self._read:
-            return b''
-        self._read = True
-        return _test_gif
+        data = self._file_data[self._pointer:self._pointer + size]
+        self._pointer += size
+        return data
+
+    def seek(self, pos):
+        self._pointer = pos
 
 
 class IContent(Interface):
@@ -30,14 +37,23 @@ class IContent(Interface):
 async def _cleanup():
     util = getUtility(IS3BlobStore)
     async for item in util.iterate_bucket():
-        util._s3client.delete_object(Bucket=util.get_bucket_name(), Key=item.key)
+        await util._s3aioclient.delete_object(
+            Bucket=await util.get_bucket_name(), Key=item['Key'])
 
 
-def test_get_storage_object(dummy_request):
+async def get_all_objects():
+    util = getUtility(IS3BlobStore)
+    items = []
+    async for item in util.iterate_bucket():
+        items.append(item)
+    return items
+
+
+async def test_get_storage_object(dummy_request):
     request = dummy_request  # noqa
     request._container_id = 'test-container'
     util = getUtility(IS3BlobStore)
-    assert util.bucket is not None
+    assert await util.get_bucket_name() is not None
 
 
 async def test_store_file_in_cloud(dummy_request):
@@ -68,10 +84,9 @@ async def test_store_file_in_cloud(dummy_request):
     assert ob.file.md5 is not None
     assert ob._p_oid in ob.file.uri
 
-    util = getUtility(IS3BlobStore)
-    assert len([o for o in util.bucket.objects.all()]) == 1
+    assert len(await get_all_objects()) == 1
     await ob.file.deleteUpload()
-    assert len([o for o in util.bucket.objects.all()]) == 0
+    assert len(await get_all_objects()) == 0
 
 
 def test_gen_key(dummy_request):
@@ -90,7 +105,6 @@ async def test_rename(dummy_request):
     request = dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
-    util = getUtility(IS3BlobStore)
     await _cleanup()
 
     request.headers.update({
@@ -110,9 +124,9 @@ async def test_rename(dummy_request):
     await ob.file.rename_cloud_file('test-container/foobar')
     assert ob.file.uri == 'test-container/foobar'
 
-    items = [o for o in util.bucket.objects.all()]
+    items = await get_all_objects()
     assert len(items) == 1
-    assert items[0].key == 'test-container/foobar'
+    assert items[0]['Key'] == 'test-container/foobar'
 
 
 async def test_iterate_storage(dummy_request):
@@ -143,3 +157,34 @@ async def test_iterate_storage(dummy_request):
     assert len(items) == 20
 
     await _cleanup()
+
+
+async def test_download(dummy_request):
+    request = dummy_request  # noqa
+    login(request)
+    request._container_id = 'test-container'
+    await _cleanup()
+
+    file_data = b''
+    # we want to test multiple chunks here...
+    while len(file_data) < CHUNK_SIZE:
+        file_data += _test_gif
+
+    request.headers.update({
+        'Content-Type': 'image/gif',
+        'X-UPLOAD-MD5HASH': md5(file_data).hexdigest(),
+        'X-UPLOAD-EXTENSION': 'gif',
+        'X-UPLOAD-SIZE': len(file_data),
+        'X-UPLOAD-FILENAME': 'test.gif'
+    })
+    request._payload = FakeContentReader(file_data)
+
+    ob = create_content()
+    ob.file = None
+    mng = S3FileManager(ob, request, IContent['file'])
+    await mng.upload()
+    assert ob.file._upload_file_id is None
+    assert ob.file.uri is not None
+
+    resp = await mng.download()
+    assert resp.content_length == len(file_data)

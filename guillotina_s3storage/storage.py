@@ -9,6 +9,7 @@ from guillotina.browser import Response
 from guillotina.component import getUtility
 from guillotina.event import notify
 from guillotina.interfaces import IAbsoluteURL
+from guillotina.interfaces import IApplication
 from guillotina.interfaces import IFileManager
 from guillotina.interfaces import IRequest
 from guillotina.interfaces import IResource
@@ -311,9 +312,11 @@ class S3File:
             Exception('To rename a uri must be set on the object')
         util = getUtility(IS3BlobStore)
 
-        util._s3client.copy({'Bucket':self._bucket_name, 'Key': self.uri},
-                            self._bucket_name, new_uri)
-        util._s3client.delete_object(Bucket=self._bucket_name, Key=self.uri)
+        await util._s3aioclient.copy_object(
+            CopySource={'Bucket': self._bucket_name, 'Key': self.uri},
+            Bucket=self._bucket_name, Key=new_uri)
+        await util._s3aioclient.delete_object(
+            Bucket=self._bucket_name, Key=self.uri)
         self._uri = new_uri
 
     async def initUpload(self, context):
@@ -326,18 +329,18 @@ class S3File:
         util = getUtility(IS3BlobStore)
         request = get_current_request()
         if hasattr(self, '_upload_file_id') and self._upload_file_id is not None:  # noqa
-            util._s3client.abort_multipart_upload(
+            await util._s3aioclient.abort_multipart_upload(
                 Bucket=self._bucket_name,
                 Key=self._upload_file_id,
                 UploadId=self._mpu['UploadId'])
             self._mpu = None
             self._upload_file_id = None
 
-        bucket = util.bucket
-        self._bucket_name = bucket._name
+        bucket_name = await util.get_bucket_name()
+        self._bucket_name = bucket_name
         self._upload_file_id = self.generate_key(request, context)
         self._multipart = {'Parts': []}
-        self._mpu = util._s3client.create_multipart_upload(
+        self._mpu = await util._s3aioclient.create_multipart_upload(
             Bucket=self._bucket_name, Key=self._upload_file_id)
         self._current_upload = 0
         self._block = 1
@@ -346,7 +349,7 @@ class S3File:
 
     async def appendData(self, data):
         util = getUtility(IS3BlobStore)
-        part = util._s3client.upload_part(
+        part = await util._s3aioclient.upload_part(
             Bucket=self._bucket_name,
             Key=self._upload_file_id,
             PartNumber=self._block,
@@ -368,14 +371,13 @@ class S3File:
         # It would be great to do on AfterCommit
         if self.uri is not None:
             try:
-                util._s3client.delete_object(
-                    Bucket=self._bucket_name,
-                    Key=self.uri)
+                await util._s3aioclient.delete_object(
+                    Bucket=self._bucket_name, Key=self.uri)
             except botocore.exceptions.ClientError as e:
                 log.warn('Error deleting object', exc_info=True)
         self._uri = self._upload_file_id
         if self._mpu is not None:
-            util._s3client.complete_multipart_upload(
+            await util._s3aioclient.complete_multipart_upload(
                 Bucket=self._bucket_name,
                 Key=self._upload_file_id,
                 UploadId=self._mpu['UploadId'],
@@ -389,21 +391,26 @@ class S3File:
         util = getUtility(IS3BlobStore)
 
         if hasattr(self, '_upload_file_id') and self._upload_file_id is not None:  # noqa
-            util._s3client.abort_multipart_upload(
+            await util._s3aioclient.abort_multipart_upload(
                 Bucket=self._bucket_name,
                 Key=self._upload_file_id,
                 UploadId=self._mpu['UploadId'])
             self._mpu = None
             self._upload_file_id = None
         file_data = BytesIO(data)
-        bucket = util.bucket
-        self._bucket_name = bucket._name
+        bucket_name = await util.get_bucket_name()
+        self._bucket_name = bucket_name
         request = get_current_request()
         self._upload_file_id = request._container_id + '/' + uuid.uuid4().hex
-        response = util._s3client.upload_fileobj(
+
+        # XXX no support for upload_fileobj in aiobotocore so run in executor
+        root = getUtility(IApplication, name='root')
+        response = await util._loop.run_in_executor(
+            root.executor, util._s3client.upload_fileobj,
             file_data,
             self._bucket_name,
             self._upload_file_id)
+
         self._block += 1
         self._current_upload += len(data)
         return response
@@ -414,9 +421,8 @@ class S3File:
             uri = self.uri
         if uri is not None:
             try:
-                util._s3client.delete_object(
-                    Bucket=self._bucket_name,
-                    Key=uri)
+                await util._s3aioclient.delete_object(
+                    Bucket=self._bucket_name, Key=uri)
             except botocore.exceptions.ClientError as e:
                 log.warn('Error deleting object', exc_info=True)
         else:
@@ -497,56 +503,59 @@ class S3BlobStore(object):
 
         if loop is None:
             loop = asyncio.get_event_loop()
-        self.session = aiobotocore.get_session(loop=loop)
+        self._s3aiosession = aiobotocore.get_session(loop=loop)
 
         # This client is for downloads only
-        self._s3aioclient = self.session.create_client(
+        self._s3aioclient = self._s3aiosession.create_client(
             's3',
             aws_secret_access_key=self._aws_secret_key,
             aws_access_key_id=self._aws_access_key)
+        self._cached_buckets = []
 
         self._bucket_name = settings['bucket']
 
+        # right now, only used for upload_fileobj in executor
         self._s3client = boto3.client(
             's3',
             aws_access_key_id=self._aws_access_key,
             aws_secret_access_key=self._aws_secret_key
         )
 
-        self._s3 = boto3.resource(
-            's3',
-            aws_access_key_id=self._aws_access_key,
-            aws_secret_access_key=self._aws_secret_key
-        )
-
-    def get_bucket_name(self):
+    async def get_bucket_name(self):
         request = get_current_request()
-        return request._container_id.lower() + '.' + self._bucket_name
+        bucket_name = request._container_id.lower() + '.' + self._bucket_name
 
-    @property
-    def bucket(self):
-        bucket_name = self.get_bucket_name()
+        if bucket_name in self._cached_buckets:
+            return bucket_name
 
-        bucket = self._s3.Bucket(bucket_name)
+        missing = False
         try:
-            self._s3.meta.client.head_bucket(Bucket=bucket_name)
+            res = await self._s3aioclient.head_bucket(Bucket=bucket_name)
+            if res['ResponseMetadata']['HTTPStatusCode'] == 404:
+                missing = True
         except botocore.exceptions.ClientError as e:
-            # If a client error is thrown, then check that it was a 404 error.
-            # If it was a 404 error, then the bucket does not exist.
             error_code = int(e.response['Error']['Code'])
             if error_code == 404:
-                self._s3.create_bucket(Bucket=bucket_name)
-                bucket = self._s3.Bucket(bucket_name)
-        return bucket
+                missing = True
+
+        if missing:
+            await self._s3aioclient.create_bucket(Bucket=bucket_name)
+        return bucket_name
 
     async def initialize(self, app=None):
         # No asyncio loop to run
         self.app = app
 
     async def finalize(self, app=None):
-        self.session.close()
+        self._s3aiosession.close()
 
     async def iterate_bucket(self):
         req = get_current_request()
-        for item in self.bucket.objects.filter(Prefix=req._container_id + '/'):
-            yield item
+        bucket_name = await self.get_bucket_name()
+        result = await self._s3aioclient.list_objects(
+            Bucket=bucket_name, Prefix=req._container_id + '/')
+        paginator = self._s3aioclient.get_paginator('list_objects')
+        async for result in paginator.paginate(
+                Bucket=bucket_name, Prefix=req._container_id + '/'):
+            for item in result.get('Contents', []):
+                yield item

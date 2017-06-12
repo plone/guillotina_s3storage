@@ -1,7 +1,14 @@
-1.0.9 (unreleased)
+2.0.0 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Make all network activity async
+  [vangheem]
+
+- Rename S3BlobStore.get_bucket to coroutine:S3BlobStore.get_bucket_name
+  [vangheem]
+
+- Rename S3BlobStore.session renamed to S3BlobStore._s3aiosession
+  [vangheem]
 
 
 1.0.8 (2017-05-19)
