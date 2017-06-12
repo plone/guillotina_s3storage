@@ -1,4 +1,4 @@
-2.0.0 (unreleased)
+1.0.9 (2017-06-12)
 ------------------
 
 - Make all network activity async
