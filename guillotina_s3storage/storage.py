@@ -254,12 +254,12 @@ class S3FileManager(object):
         })
         return resp
 
-    async def download(self):
+    async def download(self, disposition='attachment'):
         file = self.field.get(self.context)
         if file is None:
             raise AttributeError('No field value')
         resp = StreamResponse(headers={
-            'CONTENT-DISPOSITION': 'attachment; filename="%s"' % file.filename
+            'CONTENT-DISPOSITION': f'{disposition}; filename="%s"' % file.filename
         })
         resp.content_type = file.content_type
         resp.content_type = 'application/octet-stream'

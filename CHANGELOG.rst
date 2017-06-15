@@ -1,7 +1,8 @@
 1.0.10 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Be able to customize content disposition header of file download
+  [vangheem]
 
 
 1.0.9 (2017-06-12)
