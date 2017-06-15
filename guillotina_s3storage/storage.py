@@ -32,6 +32,7 @@ import base64
 import boto3
 import botocore
 import logging
+import mimetypes
 import uuid
 
 
@@ -48,19 +49,21 @@ class S3Exception(Exception):
     pass
 
 
+def _to_str(value):
+    if isinstance(value, bytes):
+        value = value.decode('utf-8')
+    return value
+
+
 @configure.adapter(
     for_=IS3File,
     provides=IValueToJson)
 def json_converter(value):
     if value is None:
         return value
-
-    ct = value.content_type
-    if isinstance(ct, bytes):
-        ct = ct.decode('utf-8')
     return {
         'filename': value.filename,
-        'content_type': ct,
+        'content_type': _to_str(value.content_type),
         'size': value.size,
         'extension': value.extension,
         'md5': value.md5
@@ -261,8 +264,7 @@ class S3FileManager(object):
         resp = StreamResponse(headers={
             'CONTENT-DISPOSITION': f'{disposition}; filename="%s"' % file.filename
         })
-        resp.content_type = file.content_type
-        resp.content_type = 'application/octet-stream'
+        resp.content_type = file.guess_content_type()
         resp.content_length = file._size
 
         downloader = await file.download(None)
@@ -299,6 +301,15 @@ class S3File:
 
         self._size = size
         self._md5 = md5
+
+    def guess_content_type(self):
+        ct = _to_str(self.content_type)
+        if ct == 'application/octet-stream':
+            # try guessing content_type
+            ct, _ = mimetypes.guess_type(self.filename)
+            if ct is None:
+                ct = 'application/octet-stream'
+        return ct
 
     def generate_key(self, request, context):
         return '{}{}/{}::{}'.format(
