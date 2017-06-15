@@ -1,4 +1,4 @@
-1.0.11 (unreleased)
+1.0.11 (2017-06-15)
 -------------------
 
 - Guess content type if none provided when downloading file
