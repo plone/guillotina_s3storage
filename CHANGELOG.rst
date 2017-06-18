@@ -1,4 +1,4 @@
-1.0.12 (unreleased)
+1.0.12 (2017-06-18)
 -------------------
 
 - Be able to provide more s3 connection options
