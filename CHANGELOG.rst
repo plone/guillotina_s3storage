@@ -1,7 +1,8 @@
 1.0.12 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Be able to provide more s3 connection options
+  [vangheem]
 
 
 1.0.11 (2017-06-15)
