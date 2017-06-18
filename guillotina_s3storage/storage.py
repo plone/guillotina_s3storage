@@ -512,25 +512,27 @@ class S3BlobStore(object):
         self._aws_access_key = settings['aws_client_id']
         self._aws_secret_key = settings['aws_client_secret']
 
+        opts = dict(
+            aws_secret_access_key=self._aws_secret_key,
+            aws_access_key_id=self._aws_access_key,
+            endpoint_url=settings.get('endpoint_url'),
+            verify=settings.get('verify_ssl'),
+            use_ssl=settings.get('ssl', True),
+            region_name=settings.get('region_name')
+        )
+
         if loop is None:
             loop = asyncio.get_event_loop()
         self._s3aiosession = aiobotocore.get_session(loop=loop)
 
         # This client is for downloads only
-        self._s3aioclient = self._s3aiosession.create_client(
-            's3',
-            aws_secret_access_key=self._aws_secret_key,
-            aws_access_key_id=self._aws_access_key)
+        self._s3aioclient = self._s3aiosession.create_client('s3', **opts)
         self._cached_buckets = []
 
         self._bucket_name = settings['bucket']
 
         # right now, only used for upload_fileobj in executor
-        self._s3client = boto3.client(
-            's3',
-            aws_access_key_id=self._aws_access_key,
-            aws_secret_access_key=self._aws_secret_key
-        )
+        self._s3client = boto3.client('s3', **opts)
 
     async def get_bucket_name(self):
         request = get_current_request()
