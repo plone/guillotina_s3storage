@@ -1,7 +1,8 @@
 1.0.13 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Make sure to set the loop used with the utility
+  [vangheem]
 
 
 1.0.12 (2017-06-18)

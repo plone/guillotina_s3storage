@@ -523,6 +523,8 @@ class S3BlobStore(object):
 
         if loop is None:
             loop = asyncio.get_event_loop()
+        self._loop = loop
+
         self._s3aiosession = aiobotocore.get_session(loop=loop)
 
         # This client is for downloads only
