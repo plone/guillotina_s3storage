@@ -1,4 +1,4 @@
-1.0.13 (unreleased)
+1.0.13 (2017-06-21)
 -------------------
 
 - Make sure to set the loop used with the utility
