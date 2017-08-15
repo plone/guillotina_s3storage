@@ -1,7 +1,8 @@
 1.0.14 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Provide iter_data method
+  [vangheem]
 
 
 1.0.13 (2017-06-21)

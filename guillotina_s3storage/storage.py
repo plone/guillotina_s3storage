@@ -279,6 +279,21 @@ class S3FileManager(object):
 
         return resp
 
+    async def iter_data(self):
+        file = self.field.get(self.context)
+        if file is None:
+            raise AttributeError('No field value')
+
+        downloader = await file.download(None)
+
+        async with downloader['Body'] as stream:
+            data = await stream.read(CHUNK_SIZE)
+            while True:
+                if not data:
+                    break
+                yield data
+                data = await stream.read(CHUNK_SIZE)
+
 
 @implementer(IS3File)
 class S3File:
