@@ -1,7 +1,8 @@
 1.0.15 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Implement save_file method
+  [vangheem]
 
 
 1.0.14 (2017-08-15)
