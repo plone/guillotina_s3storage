@@ -1,4 +1,4 @@
-1.0.15 (unreleased)
+1.0.15 (2017-09-01)
 -------------------
 
 - Implement save_file method
