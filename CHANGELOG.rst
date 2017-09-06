@@ -1,8 +1,9 @@
 1.0.16 (unreleased)
 -------------------
 
-- Nothing changed yet.
-
+- Fix aborting upload of existing when no multipart upload data is stored on
+  the file object.
+  [vangheem]
 
 1.0.15 (2017-09-01)
 -------------------

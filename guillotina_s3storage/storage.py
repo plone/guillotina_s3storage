@@ -376,10 +376,11 @@ class S3File:
         util = getUtility(IS3BlobStore)
         request = get_current_request()
         if hasattr(self, '_upload_file_id') and self._upload_file_id is not None:  # noqa
-            await util._s3aioclient.abort_multipart_upload(
-                Bucket=self._bucket_name,
-                Key=self._upload_file_id,
-                UploadId=self._mpu['UploadId'])
+            if getattr(self, '_mpu', None) is not None:
+                await util._s3aioclient.abort_multipart_upload(
+                    Bucket=self._bucket_name,
+                    Key=self._upload_file_id,
+                    UploadId=self._mpu['UploadId'])
             self._mpu = None
             self._upload_file_id = None
 
