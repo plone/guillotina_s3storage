@@ -1,4 +1,4 @@
-1.0.16 (unreleased)
+1.0.16 (2017-09-06)
 -------------------
 
 - Fix aborting upload of existing when no multipart upload data is stored on
