@@ -257,7 +257,9 @@ class S3FileManager(object):
         })
         return resp
 
-    async def download(self, disposition='attachment'):
+    async def download(self, disposition=None):
+        if disposition is None:
+            disposition = self.request.GET.get('disposition', 'attachment')
         file = self.field.get(self.context)
         if file is None:
             raise AttributeError('No field value')
