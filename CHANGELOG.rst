@@ -1,4 +1,4 @@
-1.0.18 (unreleased)
+1.0.18 (2017-09-11)
 -------------------
 
 - Make sure CORS headers are applied before we start sending a download result
