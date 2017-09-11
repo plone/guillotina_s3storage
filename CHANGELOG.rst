@@ -1,7 +1,8 @@
 1.0.18 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Make sure CORS headers are applied before we start sending a download result
+  [vangheem]
 
 
 1.0.17 (2017-09-11)

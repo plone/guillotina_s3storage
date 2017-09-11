@@ -4,6 +4,7 @@ from aiohttp.web import StreamResponse
 from datetime import datetime
 from datetime import timedelta
 from dateutil.tz import tzlocal
+from guillotina import app_settings
 from guillotina import configure
 from guillotina.browser import Response
 from guillotina.component import getUtility
@@ -263,9 +264,14 @@ class S3FileManager(object):
         file = self.field.get(self.context)
         if file is None:
             raise AttributeError('No field value')
-        resp = StreamResponse(headers={
+
+        cors_renderer = app_settings['cors_renderer'](self.request)
+        headers = await cors_renderer.get_headers()
+        headers.update({
             'CONTENT-DISPOSITION': f'{disposition}; filename="%s"' % file.filename
         })
+
+        resp = StreamResponse(headers=headers)
         resp.content_type = file.guess_content_type()
         resp.content_length = file._size
 
