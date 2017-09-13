@@ -1,4 +1,4 @@
-1.0.19 (unreleased)
+1.0.19 (2017-09-13)
 -------------------
 
 - Do not create multipart upload objects for files smaller than 5mb
