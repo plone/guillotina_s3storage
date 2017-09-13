@@ -1,7 +1,7 @@
 1.0.20 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Fix release
 
 
 1.0.19 (2017-09-13)
