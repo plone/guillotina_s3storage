@@ -175,11 +175,13 @@ class S3FileManager(object):
             filename = self.request.headers['UPLOAD-METADATA']
             file.filename = base64.b64decode(filename.split()[1]).decode('utf-8')
 
-        await file.initUpload(self.context)
         if file.size < MIN_UPLOAD_SIZE:
             file._one_tus_shoot = True
         else:
             file._one_tus_shoot = False
+
+        await file.initUpload(self.context)
+
         # Location will need to be adapted on aiohttp 1.1.x
         resp = Response(headers={
             'Location': IAbsoluteURL(
@@ -396,8 +398,9 @@ class S3File:
         self._bucket_name = bucket_name
         self._upload_file_id = self.generate_key(request, context)
         self._multipart = {'Parts': []}
-        self._mpu = await util._s3aioclient.create_multipart_upload(
-            Bucket=self._bucket_name, Key=self._upload_file_id)
+        if not self.one_tus_shoot:
+            self._mpu = await util._s3aioclient.create_multipart_upload(
+                Bucket=self._bucket_name, Key=self._upload_file_id)
         self._current_upload = 0
         self._block = 1
         self._resumable_uri_date = datetime.now(tz=tzlocal())
@@ -447,10 +450,11 @@ class S3File:
         util = getUtility(IS3BlobStore)
 
         if hasattr(self, '_upload_file_id') and self._upload_file_id is not None:  # noqa
-            await util._s3aioclient.abort_multipart_upload(
-                Bucket=self._bucket_name,
-                Key=self._upload_file_id,
-                UploadId=self._mpu['UploadId'])
+            if getattr(self, '_mpu', None) is not None:
+                await util._s3aioclient.abort_multipart_upload(
+                    Bucket=self._bucket_name,
+                    Key=self._upload_file_id,
+                    UploadId=self._mpu['UploadId'])
             self._mpu = None
             self._upload_file_id = None
         file_data = BytesIO(data)
