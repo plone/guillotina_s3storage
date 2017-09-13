@@ -1,7 +1,8 @@
 1.0.19 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Do not create multipart upload objects for files smaller than 5mb
+  [vangheems]
 
 
 1.0.18 (2017-09-11)
