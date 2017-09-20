@@ -1,7 +1,8 @@
 1.0.21 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Retry errors to api
+  [vangheem]
 
 
 1.0.20 (2017-09-13)
