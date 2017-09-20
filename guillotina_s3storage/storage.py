@@ -24,6 +24,7 @@ from guillotina_s3storage.events import InitialS3Upload
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.interfaces import IS3File
 from guillotina_s3storage.interfaces import IS3FileField
+from guillotina_s3storage.utils import aretriable
 from io import BytesIO
 from zope.interface import implementer
 
@@ -169,7 +170,9 @@ class S3FileManager(object):
         if 'TUS-RESUMABLE' not in self.request.headers:
             raise AttributeError('Its a TUS needs a TUS version')
 
-        if 'UPLOAD-METADATA' not in self.request.headers:
+        if 'UPLOAD-FILENAME' in self.request.headers:
+            file.filename = self.request.headers['UPLOAD-FILENAME']
+        elif 'UPLOAD-METADATA' not in self.request.headers:
             file.filename = uuid.uuid4().hex
         else:
             filename = self.request.headers['UPLOAD-METADATA']
@@ -387,10 +390,7 @@ class S3File:
         request = get_current_request()
         if hasattr(self, '_upload_file_id') and self._upload_file_id is not None:  # noqa
             if getattr(self, '_mpu', None) is not None:
-                await util._s3aioclient.abort_multipart_upload(
-                    Bucket=self._bucket_name,
-                    Key=self._upload_file_id,
-                    UploadId=self._mpu['UploadId'])
+                await self._abort_multipart()
             self._mpu = None
             self._upload_file_id = None
 
@@ -399,21 +399,28 @@ class S3File:
         self._upload_file_id = self.generate_key(request, context)
         self._multipart = {'Parts': []}
         if not self.one_tus_shoot:
-            self._mpu = await util._s3aioclient.create_multipart_upload(
-                Bucket=self._bucket_name, Key=self._upload_file_id)
+            await self._create_multipart()
         self._current_upload = 0
         self._block = 1
         self._resumable_uri_date = datetime.now(tz=tzlocal())
         await notify(InitialS3Upload(context))
 
-    async def appendData(self, data):
+    @aretriable(3)
+    async def _create_multipart(self):
         util = getUtility(IS3BlobStore)
-        part = await util._s3aioclient.upload_part(
+        self._mpu = await util._s3aioclient.create_multipart_upload(
+            Bucket=self._bucket_name, Key=self._upload_file_id)
+
+    @aretriable(3)
+    async def _abort_multipart(self):
+        util = getUtility(IS3BlobStore)
+        await util._s3aioclient.abort_multipart_upload(
             Bucket=self._bucket_name,
             Key=self._upload_file_id,
-            PartNumber=self._block,
-            UploadId=self._mpu['UploadId'],
-            Body=data)
+            UploadId=self._mpu['UploadId'])
+
+    async def appendData(self, data):
+        part = await self._upload_part(data)
         self._multipart['Parts'].append({
             'PartNumber': self._block,
             'ETag': part['ETag']
@@ -421,6 +428,16 @@ class S3File:
         self._current_upload += len(data)
         self._block += 1
         return part
+
+    @aretriable(3)
+    async def _upload_part(self, data):
+        util = getUtility(IS3BlobStore)
+        return await util._s3aioclient.upload_part(
+            Bucket=self._bucket_name,
+            Key=self._upload_file_id,
+            PartNumber=self._block,
+            UploadId=self._mpu['UploadId'],
+            Body=data)
 
     def actualSize(self):
         return self._current_upload
@@ -436,15 +453,20 @@ class S3File:
                 log.warn('Error deleting object', exc_info=True)
         self._uri = self._upload_file_id
         if self._mpu is not None:
-            await util._s3aioclient.complete_multipart_upload(
-                Bucket=self._bucket_name,
-                Key=self._upload_file_id,
-                UploadId=self._mpu['UploadId'],
-                MultipartUpload=self._multipart)
+            await self._complete_multipart_upload()
         self._multipart = None
         self._block = None
         self._upload_file_id = None
         await notify(FinishS3Upload(context))
+
+    @aretriable(3)
+    async def _complete_multipart_upload(self):
+        util = getUtility(IS3BlobStore)
+        await util._s3aioclient.complete_multipart_upload(
+            Bucket=self._bucket_name,
+            Key=self._upload_file_id,
+            UploadId=self._mpu['UploadId'],
+            MultipartUpload=self._multipart)
 
     async def oneShotUpload(self, context, data):
         util = getUtility(IS3BlobStore)
@@ -463,6 +485,15 @@ class S3File:
         request = get_current_request()
         self._upload_file_id = request._container_id + '/' + uuid.uuid4().hex
 
+        response = await self._upload_fileobj(file_data)
+
+        self._block += 1
+        self._current_upload += len(data)
+        return response
+
+    @aretriable(3)
+    async def _upload_fileobj(self, file_data):
+        util = getUtility(IS3BlobStore)
         # XXX no support for upload_fileobj in aiobotocore so run in executor
         root = getUtility(IApplication, name='root')
         response = await util._loop.run_in_executor(
@@ -470,9 +501,6 @@ class S3File:
             file_data,
             self._bucket_name,
             self._upload_file_id)
-
-        self._block += 1
-        self._current_upload += len(data)
         return response
 
     async def deleteUpload(self, uri=None):
@@ -489,14 +517,17 @@ class S3File:
             raise AttributeError('No valid uri')
 
     async def download(self, buf):
-        util = getUtility(IS3BlobStore)
         if not hasattr(self, '_uri'):
             url = self._upload_file_id
         else:
             url = self._uri
 
-        downloader = await util._s3aioclient.get_object(Bucket=self._bucket_name, Key=url)
-        return downloader
+        return await self._download(url)
+
+    @aretriable(3)
+    async def _download(self, url):
+        util = getUtility(IS3BlobStore)
+        return await util._s3aioclient.get_object(Bucket=self._bucket_name, Key=url)
 
     def _set_data(self, data):
         raise NotImplemented('Only specific upload permitted')

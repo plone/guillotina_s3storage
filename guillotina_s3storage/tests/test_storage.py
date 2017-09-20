@@ -89,6 +89,41 @@ async def test_store_file_in_cloud(dummy_request):
     assert len(await get_all_objects()) == 0
 
 
+async def test_store_file_in_cloud_using_tus(dummy_request):
+    request = dummy_request  # noqa
+    login(request)
+    request._container_id = 'test-container'
+    await _cleanup()
+
+    request.headers.update({
+        'Content-Type': 'image/gif',
+        'UPLOAD-MD5HASH': md5(_test_gif).hexdigest(),
+        'UPLOAD-EXTENSION': 'gif',
+        'UPLOAD-FILENAME': 'test.gif',
+        'UPLOAD-LENGTH': len(_test_gif),
+        'TUS-RESUMABLE': '1.0.0',
+        'Content-Length': len(_test_gif),
+        'upload-offset': 0
+    })
+    request._payload = FakeContentReader()
+
+    ob = create_content()
+    ob.file = None
+    mng = S3FileManager(ob, request, IContent['file'])
+    await mng.tus_create()
+    await mng.tus_patch()
+    assert ob.file._upload_file_id is None
+    assert ob.file.uri is not None
+
+    assert ob.file.content_type == b'image/gif'
+    assert ob.file.filename == 'test.gif'
+    assert ob.file._size == len(_test_gif)
+
+    assert len(await get_all_objects()) == 1
+    await ob.file.deleteUpload()
+    assert len(await get_all_objects()) == 0
+
+
 def test_gen_key(dummy_request):
     request = dummy_request  # noqa
     request._container_id = 'test-container'
