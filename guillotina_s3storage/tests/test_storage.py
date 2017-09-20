@@ -124,6 +124,119 @@ async def test_store_file_in_cloud_using_tus(dummy_request):
     assert len(await get_all_objects()) == 0
 
 
+async def test_multipart_upload_with_tus(dummy_request):
+    request = dummy_request  # noqa
+    login(request)
+    request._container_id = 'test-container'
+    await _cleanup()
+
+    file_data = _test_gif
+    while len(file_data) < (11 * 1024 * 1024):
+        file_data += _test_gif
+
+    request.headers.update({
+        'Content-Type': 'image/gif',
+        'UPLOAD-MD5HASH': md5(file_data).hexdigest(),
+        'UPLOAD-EXTENSION': 'gif',
+        'UPLOAD-FILENAME': 'test.gif',
+        'TUS-RESUMABLE': '1.0.0',
+        'UPLOAD-LENGTH': len(file_data)
+    })
+    request._payload = FakeContentReader()
+
+    ob = create_content()
+    ob.file = None
+    mng = S3FileManager(ob, request, IContent['file'])
+    await mng.tus_create()
+
+    chunk = file_data[:5 * 1024 * 1024]
+    request.headers.update({
+        'Content-Length': len(chunk),
+        'upload-offset': 0
+    })
+    request._payload = FakeContentReader(chunk)
+    await mng.tus_patch()
+
+    chunk = file_data[5 * 1024 * 1024:]
+    request.headers.update({
+        'Content-Length': len(chunk),
+        'upload-offset': 5 * 1024 * 1024
+    })
+    request._payload = FakeContentReader(chunk)
+    await mng.tus_patch()
+
+    assert ob.file._upload_file_id is None
+    assert ob.file.uri is not None
+
+    assert ob.file.content_type == b'image/gif'
+    assert ob.file.filename == 'test.gif'
+    assert ob.file._size == len(file_data)
+
+    assert len(await get_all_objects()) == 1
+    await ob.file.deleteUpload()
+    assert len(await get_all_objects()) == 0
+
+
+async def test_multipart_upload_with_tus_and_tid_conflict(dummy_request):
+    request = dummy_request  # noqa
+    login(request)
+    request._container_id = 'test-container'
+    await _cleanup()
+
+    file_data = _test_gif
+    while len(file_data) < (11 * 1024 * 1024):
+        file_data += _test_gif
+
+    request.headers.update({
+        'Content-Type': 'image/gif',
+        'UPLOAD-MD5HASH': md5(file_data).hexdigest(),
+        'UPLOAD-EXTENSION': 'gif',
+        'UPLOAD-FILENAME': 'test.gif',
+        'TUS-RESUMABLE': '1.0.0',
+        'UPLOAD-LENGTH': len(file_data)
+    })
+    request._payload = FakeContentReader()
+
+    ob = create_content()
+    ob.file = None
+    mng = S3FileManager(ob, request, IContent['file'])
+    await mng.tus_create()
+
+    chunk = file_data[:5 * 1024 * 1024]
+    request.headers.update({
+        'Content-Length': len(chunk),
+        'upload-offset': 0
+    })
+    request._payload = FakeContentReader(chunk)
+    await mng.tus_patch()
+
+    # do this chunk over again...
+    ob.file._current_upload -= len(chunk)
+    ob.file._block -= 1
+    ob.file._multipart['Parts'] = ob.file._multipart['Parts'][:-1]
+    request._payload = FakeContentReader(chunk)
+    await mng.tus_patch()
+
+    chunk = file_data[5 * 1024 * 1024:]
+    request.headers.update({
+        'Content-Length': len(chunk),
+        'upload-offset': 5 * 1024 * 1024
+    })
+    request._payload = FakeContentReader(chunk)
+    await mng.tus_patch()
+
+    assert ob.file._upload_file_id is None
+    assert ob.file.uri is not None
+
+    assert ob.file.content_type == b'image/gif'
+    assert ob.file.filename == 'test.gif'
+    assert ob.file._size == len(file_data)
+
+    assert len(await get_all_objects()) == 1
+    await ob.file.deleteUpload()
+    assert len(await get_all_objects()) == 0
+
+
 def test_gen_key(dummy_request):
     request = dummy_request  # noqa
     request._container_id = 'test-container'
