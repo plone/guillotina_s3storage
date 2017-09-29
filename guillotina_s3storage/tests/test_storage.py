@@ -3,6 +3,7 @@ from guillotina.tests.utils import create_content
 from guillotina.tests.utils import login
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.storage import CHUNK_SIZE
+from guillotina_s3storage.storage import MAX_REQUEST_CACHE_SIZE
 from guillotina_s3storage.storage import S3File
 from guillotina_s3storage.storage import S3FileField
 from guillotina_s3storage.storage import S3FileManager
@@ -402,7 +403,7 @@ async def test_raises_not_retryable(dummy_request):
 
     file_data = b''
     # we want to test multiple chunks here...
-    while len(file_data) < CHUNK_SIZE:
+    while len(file_data) < MAX_REQUEST_CACHE_SIZE:
         file_data += _test_gif
 
     request.headers.update({

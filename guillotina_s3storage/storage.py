@@ -44,6 +44,7 @@ MAX_SIZE = 1073741824
 
 MIN_UPLOAD_SIZE = 5 * 1024 * 1024
 CHUNK_SIZE = MIN_UPLOAD_SIZE
+MAX_REQUEST_CACHE_SIZE = 6 * 1024 * 1024
 MAX_RETRIES = 5
 
 
@@ -76,7 +77,7 @@ async def read_request_data(request, chunk_size=CHUNK_SIZE):
         data = e.partial
 
     if request._cache_data is not None:
-        if len(request._cache_data) + len(data) > CHUNK_SIZE:
+        if len(request._cache_data) + len(data) > MAX_REQUEST_CACHE_SIZE:
             # we only allow caching up to chunk size, otherwise, no cache data..
             request._cache_data = None
         else:
