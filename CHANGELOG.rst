@@ -1,7 +1,8 @@
 1.0.22 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Cache data on request object in case of request conflict errors
+  [vangheem]
 
 
 1.0.21 (2017-09-19)
