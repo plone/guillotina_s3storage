@@ -23,7 +23,7 @@ class FakeContentReader:
 
     async def readexactly(self, size):
         data = self._file_data[self._pointer:self._pointer + size]
-        self._pointer += size
+        self._pointer += len(data)
         return data
 
     def seek(self, pos):
@@ -197,6 +197,8 @@ async def test_multipart_upload_with_tus(dummy_request):
         'upload-offset': 0
     })
     request._payload = FakeContentReader(chunk)
+    request._cache_data = b''
+    request._last_read_pos = 0
     await mng.tus_patch()
 
     chunk = file_data[5 * 1024 * 1024:]
@@ -205,6 +207,8 @@ async def test_multipart_upload_with_tus(dummy_request):
         'upload-offset': 5 * 1024 * 1024
     })
     request._payload = FakeContentReader(chunk)
+    request._cache_data = b''
+    request._last_read_pos = 0
     await mng.tus_patch()
 
     assert ob.file._upload_file_id is None
@@ -250,6 +254,8 @@ async def test_multipart_upload_with_tus_and_tid_conflict(dummy_request):
         'upload-offset': 0
     })
     request._payload = FakeContentReader(chunk)
+    request._cache_data = b''
+    request._last_read_pos = 0
     await mng.tus_patch()
 
     # do this chunk over again...
@@ -257,6 +263,8 @@ async def test_multipart_upload_with_tus_and_tid_conflict(dummy_request):
     ob.file._block -= 1
     ob.file._multipart['Parts'] = ob.file._multipart['Parts'][:-1]
     request._payload = FakeContentReader(chunk)
+    request._cache_data = b''
+    request._last_read_pos = 0
     await mng.tus_patch()
 
     chunk = file_data[5 * 1024 * 1024:]
@@ -265,6 +273,8 @@ async def test_multipart_upload_with_tus_and_tid_conflict(dummy_request):
         'upload-offset': 5 * 1024 * 1024
     })
     request._payload = FakeContentReader(chunk)
+    request._cache_data = b''
+    request._last_read_pos = 0
     await mng.tus_patch()
 
     assert ob.file._upload_file_id is None
@@ -335,6 +345,8 @@ async def test_iterate_storage(dummy_request):
 
     for _ in range(20):
         request._payload = FakeContentReader()
+        request._cache_data = b''
+        request._last_read_pos = 0
         ob = create_content()
         ob.file = None
         mng = S3FileManager(ob, request, IContent['file'])

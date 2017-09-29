@@ -51,17 +51,22 @@ async def read_request_data(request, chunk_size=CHUNK_SIZE):
     if getattr(request, '_retry_attempt', 0) > 0:
         # we are on a retry request, see if we have read cached data yet...
         if request._retry_attempt > getattr(request, '_last_cache_data_retry_count', 0):
-            request._last_cache_data_retry_count = request._retry_attempt
-            return request._cache_data
+            data = request._cache_data[request._last_read_pos:request._last_read_pos + chunk_size]
+            request._last_read_pos += len(data)
+            if request._last_read_pos >= len(request._cache_data):
+                # done reading cache data
+                request._last_cache_data_retry_count = request._retry_attempt
+            return data
 
     if not hasattr(request, '_cache_data'):
         request._cache_data = b''
 
     try:
-        data = await request.content.readexactly(CHUNK_SIZE)
+        data = await request.content.readexactly(chunk_size)
     except asyncio.IncompleteReadError as e:
         data = e.partial
     request._cache_data += data
+    request._last_read_pos = len(request._cache_data)
     return data
 
 
@@ -138,6 +143,7 @@ class S3FileManager(object):
             file.filename = uuid.uuid4().hex
 
         await file.initUpload(self.context)
+        self.request._last_read_pos = 0
         data = await read_request_data(self.request)
 
         count = 0
@@ -220,6 +226,7 @@ class S3FileManager(object):
         else:
             raise AttributeError('No upload-offset header')
 
+        self.request._last_read_pos = 0
         data = await read_request_data(self.request, to_upload)
 
         if file.one_tus_shoot:
