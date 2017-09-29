@@ -1,4 +1,4 @@
-1.0.22 (unreleased)
+1.0.22 (2017-09-29)
 -------------------
 
 - Cache data on request object in case of request conflict errors
