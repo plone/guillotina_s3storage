@@ -47,6 +47,24 @@ CHUNK_SIZE = MIN_UPLOAD_SIZE
 MAX_RETRIES = 5
 
 
+async def read_request_data(request, chunk_size=CHUNK_SIZE):
+    if getattr(request, '_retry_attempt', 0) > 0:
+        # we are on a retry request, see if we have read cached data yet...
+        if request._retry_attempt > getattr(request, '_last_cache_data_retry_count', 0):
+            request._last_cache_data_retry_count = request._retry_attempt
+            return request._cache_data
+
+    if not hasattr(request, '_cache_data'):
+        request._cache_data = b''
+
+    try:
+        data = await request.content.readexactly(CHUNK_SIZE)
+    except asyncio.IncompleteReadError as e:
+        data = e.partial
+    request._cache_data += data
+    return data
+
+
 class S3Exception(Exception):
     pass
 
@@ -120,10 +138,7 @@ class S3FileManager(object):
             file.filename = uuid.uuid4().hex
 
         await file.initUpload(self.context)
-        try:
-            data = await self.request.content.readexactly(CHUNK_SIZE)
-        except asyncio.IncompleteReadError as e:
-            data = e.partial
+        data = await read_request_data(self.request)
 
         count = 0
 
@@ -132,10 +147,7 @@ class S3FileManager(object):
             old_current_upload = file._current_upload  # noqa
             await file.appendData(data)
             count += 1
-            try:
-                data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
-            except asyncio.IncompleteReadError as e:
-                data = e.partial
+            data = await read_request_data(self.request)
 
         # Test resp and checksum to finish upload
         await file.finishUpload(self.context)
@@ -208,10 +220,8 @@ class S3FileManager(object):
         else:
             raise AttributeError('No upload-offset header')
 
-        try:
-            data = await self.request.content.readexactly(to_upload)
-        except asyncio.IncompleteReadError as e:
-            data = e.partial
+        data = await read_request_data(self.request, to_upload)
+
         if file.one_tus_shoot:
             # One time shoot
             if file._block > 1:
@@ -224,10 +234,7 @@ class S3FileManager(object):
                 resp = await file.appendData(data)
                 count += 1
 
-                try:
-                    data = await self.request.content.readexactly(CHUNK_SIZE)  # noqa
-                except asyncio.IncompleteReadError as e:
-                    data = e.partial
+                data = await read_request_data(self.request)
 
             expiration = file._resumable_uri_date + timedelta(days=7)
         if file._size <= file._current_upload:
