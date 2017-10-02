@@ -1,7 +1,8 @@
 1.0.24 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Add copy_cloud_file method
+  [vangheem]
 
 
 1.0.23 (2017-09-29)

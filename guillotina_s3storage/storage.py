@@ -398,7 +398,7 @@ class S3File:
             context._p_oid,
             uuid.uuid4().hex)
 
-    async def rename_cloud_file(self, new_uri):
+    async def copy_cloud_file(self, new_uri):
         if self.uri is None:
             Exception('To rename a uri must be set on the object')
         util = getUtility(IS3BlobStore)
@@ -406,9 +406,15 @@ class S3File:
         await util._s3aioclient.copy_object(
             CopySource={'Bucket': self._bucket_name, 'Key': self.uri},
             Bucket=self._bucket_name, Key=new_uri)
-        await util._s3aioclient.delete_object(
-            Bucket=self._bucket_name, Key=self.uri)
+        old_uri = self.uri
         self._uri = new_uri
+        return old_uri
+
+    async def rename_cloud_file(self, new_uri):
+        old_uri = await self.copy_cloud_file(new_uri)
+        util = getUtility(IS3BlobStore)
+        await util._s3aioclient.delete_object(
+            Bucket=self._bucket_name, Key=old_uri)
 
     async def initUpload(self, context):
         """Init an upload.
