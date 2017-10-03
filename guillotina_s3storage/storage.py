@@ -67,12 +67,10 @@ class S3FileManager(object):
         self.context._p_register()  # writing to object
 
         file = self.field.get(self.field.context or self.context)
-        if file is None:
+        if not isinstance(file, S3File):
             file = S3File(content_type=self.request.content_type)
             self.field.set(self.field.context or self.context, file)
-            # XXX no savepoint support right now?
-            # trns = get_transaction(self.request)
-            # trns.savepoint()
+
         if 'X-UPLOAD-MD5HASH' in self.request.headers:
             file._md5 = self.request.headers['X-UPLOAD-MD5HASH']
         else:
@@ -120,7 +118,7 @@ class S3FileManager(object):
             return await self.tus_patch()
 
         file = self.field.get(self.field.context or self.context)
-        if file is None:
+        if not isinstance(file, S3File):
             file = S3File(content_type=self.request.content_type)
             self.field.set(self.field.context or self.context, file)
         if 'CONTENT-LENGTH' in self.request.headers:
@@ -210,7 +208,7 @@ class S3FileManager(object):
 
     async def tus_head(self):
         file = self.field.get(self.field.context or self.context)
-        if file is None:
+        if not isinstance(file, S3File):
             raise KeyError('No file on this context')
         head_response = {
             'Upload-Offset': str(file.get_actual_size()),
@@ -235,7 +233,7 @@ class S3FileManager(object):
         if disposition is None:
             disposition = self.request.GET.get('disposition', 'attachment')
         file = self.field.get(self.field.context or self.context)
-        if file is None:
+        if not isinstance(file, S3File):
             raise AttributeError('No field value')
 
         cors_renderer = app_settings['cors_renderer'](self.request)
@@ -262,7 +260,7 @@ class S3FileManager(object):
 
     async def iter_data(self):
         file = self.field.get(self.field.context or self.context)
-        if file is None:
+        if not isinstance(file, S3File):
             raise AttributeError('No field value')
 
         downloader = await file.download(None)
@@ -280,7 +278,7 @@ class S3FileManager(object):
         self.context._p_register()  # writing to object
 
         file = self.field.get(self.field.context or self.context)
-        if file is None:
+        if not isinstance(file, S3File):
             file = S3File(content_type=content_type)
             self.field.set(self.field.context or self.context, file)
 

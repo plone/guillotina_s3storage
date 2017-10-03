@@ -1,7 +1,8 @@
 1.0.26 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Check type instead of None for existing value
+  [vangheem]
 
 
 1.0.25 (2017-10-02)
