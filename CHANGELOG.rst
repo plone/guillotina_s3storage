@@ -1,4 +1,4 @@
-1.0.25 (unreleased)
+1.0.25 (2017-10-02)
 -------------------
 
 - Use latest guillotina base classes
