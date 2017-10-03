@@ -1,7 +1,8 @@
 1.0.25 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Use field context if set
+  [vangheem]
 
 
 1.0.24 (2017-10-02)

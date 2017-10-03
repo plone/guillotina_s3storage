@@ -1,13 +1,13 @@
 from guillotina.component import getUtility
+from guillotina.exceptions import UnRetryableRequestError
+from guillotina.files import MAX_REQUEST_CACHE_SIZE
 from guillotina.tests.utils import create_content
 from guillotina.tests.utils import login
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.storage import CHUNK_SIZE
-from guillotina_s3storage.storage import MAX_REQUEST_CACHE_SIZE
 from guillotina_s3storage.storage import S3File
 from guillotina_s3storage.storage import S3FileField
 from guillotina_s3storage.storage import S3FileManager
-from guillotina_s3storage.storage import UnRetryableRequestError
 from hashlib import md5
 from zope.interface import Interface
 
@@ -88,7 +88,7 @@ async def test_store_file_in_cloud(dummy_request):
     assert ob._p_oid in ob.file.uri
 
     assert len(await get_all_objects()) == 1
-    await ob.file.deleteUpload()
+    await ob.file.delete_upload()
     assert len(await get_all_objects()) == 0
 
 
@@ -130,7 +130,7 @@ async def test_store_file_uses_cached_request_data_on_retry(dummy_request):
 
     # should delete existing and reupload
     assert len(await get_all_objects()) == 1
-    await ob.file.deleteUpload()
+    await ob.file.delete_upload()
     assert len(await get_all_objects()) == 0
 
 
@@ -165,7 +165,7 @@ async def test_store_file_in_cloud_using_tus(dummy_request):
     assert ob.file._size == len(_test_gif)
 
     assert len(await get_all_objects()) == 1
-    await ob.file.deleteUpload()
+    await ob.file.delete_upload()
     assert len(await get_all_objects()) == 0
 
 
@@ -222,7 +222,7 @@ async def test_multipart_upload_with_tus(dummy_request):
     assert ob.file._size == len(file_data)
 
     assert len(await get_all_objects()) == 1
-    await ob.file.deleteUpload()
+    await ob.file.delete_upload()
     assert len(await get_all_objects()) == 0
 
 
@@ -288,7 +288,7 @@ async def test_multipart_upload_with_tus_and_tid_conflict(dummy_request):
     assert ob.file._size == len(file_data)
 
     assert len(await get_all_objects()) == 1
-    await ob.file.deleteUpload()
+    await ob.file.delete_upload()
     assert len(await get_all_objects()) == 0
 
 
