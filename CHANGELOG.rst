@@ -1,6 +1,9 @@
 1.0.25 (unreleased)
 -------------------
 
+- Use latest guillotina base classes
+  [vangheem]
+
 - Use field context if set
   [vangheem]
 
