@@ -1,4 +1,4 @@
-1.0.26 (unreleased)
+1.0.26 (2017-10-03)
 -------------------
 
 - Check type instead of None for existing value
