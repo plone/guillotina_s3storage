@@ -1,4 +1,4 @@
-1.0.27 (unreleased)
+1.0.27 (2017-10-04)
 -------------------
 
 - Fix retry decorator
