@@ -1,7 +1,8 @@
 1.0.27 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Fix retry decorator
+  [vangheem]
 
 
 1.0.26 (2017-10-03)
