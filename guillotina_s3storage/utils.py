@@ -7,6 +7,7 @@ def aretriable(count=3, reraise=True, on_retry_exhausted=None):
                 try:
                     return await func(*args, **kwargs)
                 except:
+                    retried += 1
                     if retried >= count:
                         if on_retry_exhausted is not None:
                             on_retry_exhausted(*args, **kwargs)
