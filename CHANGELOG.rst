@@ -1,4 +1,4 @@
-1.0.28 (unreleased)
+1.0.28 (2017-10-11)
 -------------------
 
 - Return NotFound response when no file found on context
