@@ -1,7 +1,8 @@
 1.0.28 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Return NotFound response when no file found on context
+  [vangheem]
 
 
 1.0.27 (2017-10-04)

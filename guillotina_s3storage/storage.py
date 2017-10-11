@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-
 from aiohttp.web import StreamResponse
+from aiohttp.web_exceptions import HTTPNotFound
 from datetime import datetime
 from datetime import timedelta
 from dateutil.tz import tzlocal
@@ -233,8 +233,8 @@ class S3FileManager(object):
         if disposition is None:
             disposition = self.request.GET.get('disposition', 'attachment')
         file = self.field.get(self.field.context or self.context)
-        if not isinstance(file, S3File):
-            raise AttributeError('No field value')
+        if not isinstance(file, S3File) or file.uri is None:
+            return HTTPNotFound(text='No file found')
 
         cors_renderer = app_settings['cors_renderer'](self.request)
         headers = await cors_renderer.get_headers()
@@ -260,7 +260,7 @@ class S3FileManager(object):
 
     async def iter_data(self):
         file = self.field.get(self.field.context or self.context)
-        if not isinstance(file, S3File):
+        if not isinstance(file, S3File) or file.uri is None:
             raise AttributeError('No field value')
 
         downloader = await file.download(None)
