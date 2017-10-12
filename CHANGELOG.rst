@@ -1,4 +1,4 @@
-1.0.29 (unreleased)
+1.0.29 (2017-10-12)
 -------------------
 
 - Make sure to register write on object for behavior files
