@@ -1,7 +1,8 @@
 1.0.29 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Make sure to register write on object for behavior files
+  [vangheem]
 
 
 1.0.28 (2017-10-11)

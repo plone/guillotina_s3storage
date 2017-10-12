@@ -165,7 +165,10 @@ class S3FileManager(object):
         return resp
 
     async def tus_patch(self):
-        self.context._p_register()  # writing to object
+        try:
+            self.field.context.data._p_register()  # register change...
+        except AttributeError:
+            self.context._p_register()
 
         file = self.field.get(self.field.context or self.context)
         if 'CONTENT-LENGTH' in self.request.headers:
