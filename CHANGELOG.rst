@@ -1,4 +1,4 @@
-1.0.30 (unreleased)
+1.0.30 (2017-10-15)
 -------------------
 
 - Fix generating uri for one shot upload
