@@ -36,7 +36,7 @@ import logging
 import uuid
 
 
-log = logging.getLogger('pserver.storage')
+log = logging.getLogger('guillotina_s3storage')
 
 MAX_SIZE = 1073741824
 
@@ -249,7 +249,11 @@ class S3FileManager(object):
         resp.content_type = file.guess_content_type()
         resp.content_length = file._size
 
-        downloader = await file.download(None)
+        try:
+            downloader = await file.download(None)
+        except botocore.errorfactory.NoSuchKey:
+            log.error(f'Referenced key {file.uri} could not be found', exc_info=True)
+            return HTTPNotFound(text=f'Could not find {file.uri} in s3 storage')
         await resp.prepare(self.request)
 
         async with downloader['Body'] as stream:
@@ -425,7 +429,7 @@ class S3File(BaseCloudFile):
         bucket_name = await util.get_bucket_name()
         self._bucket_name = bucket_name
         request = get_current_request()
-        self._upload_file_id = request._container_id + '/' + uuid.uuid4().hex
+        self._upload_file_id = self.generate_key(request, context)
 
         response = await self._upload_fileobj(file_data)
 

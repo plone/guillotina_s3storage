@@ -1,7 +1,8 @@
 1.0.30 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Fix generating uri for one shot upload
+  [vangheem]
 
 
 1.0.29 (2017-10-12)
