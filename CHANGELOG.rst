@@ -1,7 +1,8 @@
 1.0.31 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Do not do multipart upload for files smaller than 5mb
+  [vangheem]
 
 
 1.0.30 (2017-10-15)
