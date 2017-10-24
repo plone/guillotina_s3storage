@@ -94,18 +94,24 @@ class S3FileManager(object):
         else:
             file.filename = uuid.uuid4().hex
 
+        if file.size < MIN_UPLOAD_SIZE:
+            file._one_tus_shoot = True  # need to set this...
+
         await file.init_upload(self.context)
         self.request._last_read_pos = 0
         data = await read_request_data(self.request, CHUNK_SIZE)
 
-        count = 0
+        if file.size < MIN_UPLOAD_SIZE:
+            await file.one_shot_upload(self.context, data)
+        else:
+            count = 0
 
-        # If we have data or is an empty file
-        while data or (len(data) == 0 and count == 0):
-            old_current_upload = file._current_upload  # noqa
-            await file.append_data(data)
-            count += 1
-            data = await read_request_data(self.request, CHUNK_SIZE)
+            # If we have data or is an empty file
+            while data or (len(data) == 0 and count == 0):
+                old_current_upload = file._current_upload  # noqa
+                await file.append_data(data)
+                count += 1
+                data = await read_request_data(self.request, CHUNK_SIZE)
 
         # Test resp and checksum to finish upload
         await file.finish_upload(self.context)

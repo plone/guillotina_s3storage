@@ -226,6 +226,46 @@ async def test_multipart_upload_with_tus(dummy_request):
     assert len(await get_all_objects()) == 0
 
 
+async def test_large_file_with_upload(dummy_request):
+    request = dummy_request  # noqa
+    login(request)
+    request._container_id = 'test-container'
+    await _cleanup()
+
+    file_data = _test_gif
+    while len(file_data) < (11 * 1024 * 1024):
+        file_data += _test_gif
+
+    request.headers.update({
+        'Content-Type': 'image/gif',
+        'UPLOAD-MD5HASH': md5(file_data).hexdigest(),
+        'UPLOAD-EXTENSION': 'gif',
+        'X-UPLOAD-FILENAME': 'test.gif',
+        'TUS-RESUMABLE': '1.0.0',
+        'X-UPLOAD-SIZE': len(file_data)
+    })
+    request._payload = FakeContentReader()
+
+    ob = create_content()
+    ob.file = None
+    mng = S3FileManager(ob, request, IContent['file'])
+    request._payload = FakeContentReader(file_data)
+    request._cache_data = b''
+    request._last_read_pos = 0
+    await mng.upload()
+
+    assert ob.file._upload_file_id is None
+    assert ob.file.uri is not None
+
+    assert ob.file.content_type == b'image/gif'
+    assert ob.file.filename == 'test.gif'
+    assert ob.file._size == len(file_data)
+
+    assert len(await get_all_objects()) == 1
+    await ob.file.delete_upload()
+    assert len(await get_all_objects()) == 0
+
+
 async def test_multipart_upload_with_tus_and_tid_conflict(dummy_request):
     request = dummy_request  # noqa
     login(request)
