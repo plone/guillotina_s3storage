@@ -1,4 +1,4 @@
-1.0.31 (unreleased)
+1.0.31 (2017-10-24)
 -------------------
 
 - Do not do multipart upload for files smaller than 5mb
