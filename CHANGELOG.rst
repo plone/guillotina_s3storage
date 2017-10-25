@@ -1,4 +1,4 @@
-1.0.32 (unreleased)
+1.0.32 (2017-10-25)
 -------------------
 
 - Fix issue with NoSuchKey Exception
