@@ -257,7 +257,7 @@ class S3FileManager(object):
 
         try:
             downloader = await file.download(None)
-        except botocore.errorfactory.NoSuchKey:
+        except botocore.exceptions.ClientError:
             log.error(f'Referenced key {file.uri} could not be found', exc_info=True)
             return HTTPNotFound(text=f'Could not find {file.uri} in s3 storage')
         await resp.prepare(self.request)
@@ -402,6 +402,7 @@ class S3File(BaseCloudFile):
                 await util._s3aioclient.delete_object(
                     Bucket=self._bucket_name, Key=self.uri)
             except botocore.exceptions.ClientError as e:
+                log.error(f'Referenced key {file.uri} could not be found', exc_info=True)
                 log.warn('Error deleting object', exc_info=True)
         self._uri = self._upload_file_id
         if self._mpu is not None:

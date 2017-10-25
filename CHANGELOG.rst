@@ -1,7 +1,8 @@
 1.0.32 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Fix issue with NoSuchKey Exception
+  [vangheem]
 
 
 1.0.31 (2017-10-24)
