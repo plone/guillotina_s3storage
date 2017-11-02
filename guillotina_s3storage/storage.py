@@ -300,6 +300,7 @@ class S3FileManager(object):
             filename = uuid.uuid4().hex
         file.filename = filename
 
+        file._one_tus_shoot = False
         await file.init_upload(self.context)
 
         async for data in generator():
