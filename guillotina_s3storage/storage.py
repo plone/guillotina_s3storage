@@ -300,10 +300,21 @@ class S3FileManager(object):
             filename = uuid.uuid4().hex
         file.filename = filename
 
+        if file.size < MIN_UPLOAD_SIZE:
+            file._one_tus_shoot = True  # need to set this...
+        else:
+            file._one_tus_shoot = False
+
         await file.init_upload(self.context)
 
-        async for data in generator():
-            await file.append_data(data)
+        if file.size < MIN_UPLOAD_SIZE:
+            data = b''
+            async for chunk in generator():
+                data += chunk
+            await file.one_shot_upload(self.context, data)
+        else:
+            async for data in generator():
+                await file.append_data(data)
 
         await file.finish_upload(self.context)
         return file
