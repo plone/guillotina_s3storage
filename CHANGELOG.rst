@@ -1,7 +1,8 @@
 1.0.33 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- save_file should use same tus/non tus support
+  [vangheem]
 
 
 1.0.32 (2017-10-25)
