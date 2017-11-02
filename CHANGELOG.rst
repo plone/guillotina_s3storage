@@ -1,4 +1,4 @@
-1.0.33 (unreleased)
+1.0.33 (2017-11-02)
 -------------------
 
 - save_file should use same tus/non tus support
