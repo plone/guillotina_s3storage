@@ -463,3 +463,42 @@ async def test_raises_not_retryable(dummy_request):
     request._retry_attempt = 1
     with pytest.raises(UnRetryableRequestError):
         await mng.upload()
+
+
+async def test_save_file(dummy_request):
+    request = dummy_request  # noqa
+    login(request)
+    request._container_id = 'test-container'
+    await _cleanup()
+
+    ob = create_content()
+    ob.file = None
+    mng = S3FileManager(ob, request, IContent['file'])
+
+    async def generator():
+        yield 5000 * b'x'
+    file = await mng.save_file(generator, 'application/data', 5000)
+    assert file.size == 5000
+    items = await get_all_objects()
+    assert len(items) == 1
+    assert file._one_tus_shoot
+
+
+async def test_save_file_multipart(dummy_request):
+    request = dummy_request  # noqa
+    login(request)
+    request._container_id = 'test-container'
+    await _cleanup()
+
+    ob = create_content()
+    ob.file = None
+    mng = S3FileManager(ob, request, IContent['file'])
+
+    async def generator():
+        yield CHUNK_SIZE * b'x'
+        yield CHUNK_SIZE * b'x'
+    file = await mng.save_file(generator, 'application/data', CHUNK_SIZE * 2)
+    assert file.size == CHUNK_SIZE * 2
+    items = await get_all_objects()
+    assert len(items) == 1
+    assert not file._one_tus_shoot
