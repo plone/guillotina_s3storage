@@ -377,10 +377,13 @@ class S3File(BaseCloudFile):
     @aretriable(3)
     async def _abort_multipart(self):
         util = getUtility(IS3BlobStore)
-        await util._s3aioclient.abort_multipart_upload(
-            Bucket=self._bucket_name,
-            Key=self._upload_file_id,
-            UploadId=self._mpu['UploadId'])
+        try:
+            await util._s3aioclient.abort_multipart_upload(
+                Bucket=self._bucket_name,
+                Key=self._upload_file_id,
+                UploadId=self._mpu['UploadId'])
+        except Exception:
+            log.warn('Could not abort multipart upload', exc_info=True)
 
     async def append_data(self, data):
         part = await self._upload_part(data)
@@ -419,6 +422,7 @@ class S3File(BaseCloudFile):
         if self._mpu is not None:
             await self._complete_multipart_upload()
         self._multipart = None
+        self._mpu = None
         self._block = None
         self._upload_file_id = None
         await notify(FinishS3Upload(context))
@@ -437,10 +441,7 @@ class S3File(BaseCloudFile):
 
         if hasattr(self, '_upload_file_id') and self._upload_file_id is not None:  # noqa
             if getattr(self, '_mpu', None) is not None:
-                await util._s3aioclient.abort_multipart_upload(
-                    Bucket=self._bucket_name,
-                    Key=self._upload_file_id,
-                    UploadId=self._mpu['UploadId'])
+                await self._abort_multipart()
             self._mpu = None
             self._upload_file_id = None
         file_data = BytesIO(data)

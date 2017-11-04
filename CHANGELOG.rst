@@ -1,7 +1,7 @@
 1.0.34 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Do not allow error on aborting multipart upload
 
 
 1.0.33 (2017-11-02)
