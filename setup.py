@@ -26,7 +26,7 @@ setup(
     install_requires=[
         'setuptools',
         'guillotina>=1.4.0.dev0',
-        'aiohttp<2.3.0',
+        'aiohttp<2.4.0',
         'boto3',
         'ujson',
         'aiobotocore'
