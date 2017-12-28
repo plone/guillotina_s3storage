@@ -1,7 +1,8 @@
 1.0.35 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Always set _one_tus_shoot value to True/False since it could possibly already be set
+  [vangheem]
 
 
 1.0.34 (2017-11-03)

@@ -95,7 +95,9 @@ class S3FileManager(object):
             file.filename = uuid.uuid4().hex
 
         if file.size < MIN_UPLOAD_SIZE:
-            file._one_tus_shoot = True  # need to set this...
+            file._one_tus_shoot = True
+        else:
+            file._one_tus_shoot = False
 
         await file.init_upload(self.context)
         self.request._last_read_pos = 0
@@ -416,7 +418,7 @@ class S3File(BaseCloudFile):
                 await util._s3aioclient.delete_object(
                     Bucket=self._bucket_name, Key=self.uri)
             except botocore.exceptions.ClientError as e:
-                log.error(f'Referenced key {file.uri} could not be found', exc_info=True)
+                log.error(f'Referenced key {self.uri} could not be found', exc_info=True)
                 log.warn('Error deleting object', exc_info=True)
         self._uri = self._upload_file_id
         if self._mpu is not None:
