@@ -1,4 +1,4 @@
-1.0.35 (unreleased)
+1.0.35 (2017-12-28)
 -------------------
 
 - Always set _one_tus_shoot value to True/False since it could possibly already be set
