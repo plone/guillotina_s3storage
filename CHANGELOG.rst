@@ -1,4 +1,4 @@
-1.0.36 (unreleased)
+1.0.36 (2018-02-02)
 -------------------
 
 - Fix retries to work with BytesIO data structure
