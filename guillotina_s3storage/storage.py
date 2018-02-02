@@ -446,20 +446,21 @@ class S3File(BaseCloudFile):
                 await self._abort_multipart()
             self._mpu = None
             self._upload_file_id = None
-        file_data = BytesIO(data)
+
         bucket_name = await util.get_bucket_name()
         self._bucket_name = bucket_name
         request = get_current_request()
         self._upload_file_id = self.generate_key(request, context)
 
-        response = await self._upload_fileobj(file_data)
+        response = await self._upload_fileobj(data)
 
         self._block += 1
         self._current_upload += len(data)
         return response
 
     @aretriable(3)
-    async def _upload_fileobj(self, file_data):
+    async def _upload_fileobj(self, data):
+        file_data = BytesIO(data)
         util = getUtility(IS3BlobStore)
         # XXX no support for upload_fileobj in aiobotocore so run in executor
         root = getUtility(IApplication, name='root')

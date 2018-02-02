@@ -1,7 +1,8 @@
 1.0.36 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Fix retries to work with BytesIO data structure
+  [vangheem]
 
 
 1.0.35 (2017-12-28)
