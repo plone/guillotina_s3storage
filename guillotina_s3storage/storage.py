@@ -117,7 +117,7 @@ class S3FileManager(object):
                 data = await read_request_data(self.request, CHUNK_SIZE)
 
         # Test resp and checksum to finish upload
-        await file.finish_upload(self.context)
+        await file.finish_upload(self.context, clean=self.should_clean(file))
 
     async def tus_create(self):
         self.context._p_register()  # writing to object
@@ -209,7 +209,7 @@ class S3FileManager(object):
 
             expiration = file._resumable_uri_date + timedelta(days=7)
         if file._size <= file._current_upload:
-            await file.finish_upload(self.context)
+            await file.finish_upload(self.context, clean=self.should_clean(file))
         resp = Response(headers={
             'Upload-Offset': str(file.get_actual_size()),
             'Tus-Resumable': '1.0.0',
@@ -319,8 +319,12 @@ class S3FileManager(object):
             async for data in generator():
                 await file.append_data(data)
 
-        await file.finish_upload(self.context)
+        await file.finish_upload(self.context, clean=self.should_clean(file))
         return file
+
+    def should_clean(self, file):
+        cleanup = IFileCleanup(self.context, None)
+        return cleanup is None or cleanup.should_clean(file=file, field=self.field)
 
 
 @implementer(IS3File)
@@ -411,13 +415,12 @@ class S3File(BaseCloudFile):
     def get_actual_size(self):
         return self._current_upload
 
-    async def finish_upload(self, context):
+    async def finish_upload(self, context, clean=True):
         util = getUtility(IS3BlobStore)
         # It would be great to do on AfterCommit
         if self.uri is not None:
             self._old_uri = self.uri
-            cleanup = IFileCleanup(context, None)
-            if cleanup is None or cleanup.should_clean:
+            if clean:
                 try:
                     await util._s3aioclient.delete_object(
                         Bucket=self._bucket_name, Key=self.uri)

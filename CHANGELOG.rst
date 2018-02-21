@@ -1,7 +1,8 @@
 1.0.38 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Tweak IFileCleanup
+  [vangheem]
 
 
 1.0.37 (2018-02-20)
