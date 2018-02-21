@@ -13,6 +13,7 @@ from guillotina.files import BaseCloudFile
 from guillotina.files import read_request_data
 from guillotina.interfaces import IAbsoluteURL
 from guillotina.interfaces import IApplication
+from guillotina.interfaces import IFileCleanup
 from guillotina.interfaces import IFileManager
 from guillotina.interfaces import IRequest
 from guillotina.interfaces import IResource
@@ -414,12 +415,16 @@ class S3File(BaseCloudFile):
         util = getUtility(IS3BlobStore)
         # It would be great to do on AfterCommit
         if self.uri is not None:
-            try:
-                await util._s3aioclient.delete_object(
-                    Bucket=self._bucket_name, Key=self.uri)
-            except botocore.exceptions.ClientError as e:
-                log.error(f'Referenced key {self.uri} could not be found', exc_info=True)
-                log.warn('Error deleting object', exc_info=True)
+            self._old_uri = self.uri
+            cleanup = IFileCleanup(context, None)
+            if cleanup is None or cleanup.should_clean:
+                try:
+                    await util._s3aioclient.delete_object(
+                        Bucket=self._bucket_name, Key=self.uri)
+                except botocore.exceptions.ClientError as e:
+                    log.error(
+                        f'Referenced key {self.uri} could not be found',
+                        exc_info=True)
         self._uri = self._upload_file_id
         if self._mpu is not None:
             await self._complete_multipart_upload()

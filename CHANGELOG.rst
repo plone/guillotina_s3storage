@@ -1,7 +1,8 @@
 1.0.37 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Implement IFileCleanup
+  [vangheem]
 
 
 1.0.36 (2018-02-02)
