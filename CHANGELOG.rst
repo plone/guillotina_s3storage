@@ -1,4 +1,4 @@
-1.0.38 (unreleased)
+1.0.38 (2018-02-21)
 -------------------
 
 - Tweak IFileCleanup
