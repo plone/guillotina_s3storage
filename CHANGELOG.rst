@@ -1,7 +1,8 @@
 1.0.39 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Be able to specify uri to download
+  [vangheem]
 
 
 1.0.38 (2018-02-21)

@@ -241,7 +241,7 @@ class S3FileManager(object):
         })
         return resp
 
-    async def download(self, disposition=None):
+    async def download(self, disposition=None, uri=None):
         if disposition is None:
             disposition = self.request.GET.get('disposition', 'attachment')
         file = self.field.get(self.field.context or self.context)
@@ -259,7 +259,7 @@ class S3FileManager(object):
         resp.content_length = file._size
 
         try:
-            downloader = await file.download(None)
+            downloader = await file.download(uri)
         except botocore.exceptions.ClientError:
             log.error(f'Referenced key {file.uri} could not be found', exc_info=True)
             return HTTPNotFound(text=f'Could not find {file.uri} in s3 storage')
@@ -492,13 +492,14 @@ class S3File(BaseCloudFile):
         else:
             raise AttributeError('No valid uri')
 
-    async def download(self, buf):
-        if not hasattr(self, '_uri'):
-            url = self._upload_file_id
-        else:
-            url = self._uri
+    async def download(self, uri=None):
+        if uri is None:
+            if not hasattr(self, '_uri'):
+                uri = self._upload_file_id
+            else:
+                uri = self._uri
 
-        return await self._download(url)
+        return await self._download(uri)
 
     @aretriable(3)
     async def _download(self, url):
