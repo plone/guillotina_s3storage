@@ -1,4 +1,4 @@
-1.0.39 (unreleased)
+1.0.39 (2018-02-22)
 -------------------
 
 - Be able to specify uri to download
