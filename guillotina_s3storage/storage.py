@@ -241,28 +241,36 @@ class S3FileManager(object):
         })
         return resp
 
-    async def download(self, disposition=None, uri=None):
+    async def download(self, disposition=None, uri=None, filename='download',
+                       content_type='application/octet-stream', size=None):
         if disposition is None:
             disposition = self.request.GET.get('disposition', 'attachment')
-        file = self.field.get(self.field.context or self.context)
-        if not isinstance(file, S3File) or file.uri is None:
-            return HTTPNotFound(text='No file found')
+
+        if uri is None:
+            file = self.field.get(self.field.context or self.context)
+            if not isinstance(file, S3File) or file.uri is None:
+                return HTTPNotFound(text='No file found')
+            filename = file.filename
+            uri = file.uri
+            content_type = file.guess_content_type()
+            size = file.size
 
         cors_renderer = app_settings['cors_renderer'](self.request)
         headers = await cors_renderer.get_headers()
         headers.update({
-            'CONTENT-DISPOSITION': f'{disposition}; filename="%s"' % file.filename
+            'CONTENT-DISPOSITION': f'{disposition}; filename="%s"' % filename
         })
 
         resp = StreamResponse(headers=headers)
-        resp.content_type = file.guess_content_type()
-        resp.content_length = file._size
+        resp.content_type = content_type
+        if size is not None:
+            resp.content_length = size
 
         try:
             downloader = await file.download(uri)
         except botocore.exceptions.ClientError:
-            log.error(f'Referenced key {file.uri} could not be found', exc_info=True)
-            return HTTPNotFound(text=f'Could not find {file.uri} in s3 storage')
+            log.error(f'Referenced key {uri} could not be found', exc_info=True)
+            return HTTPNotFound(text=f'Could not find {uri} in s3 storage')
         await resp.prepare(self.request)
 
         async with downloader['Body'] as stream:
@@ -420,6 +428,10 @@ class S3File(BaseCloudFile):
         # It would be great to do on AfterCommit
         if self.uri is not None:
             self._old_uri = self.uri
+            self._old_size = self.size
+            self._old_filename = self.filename
+            self._old_md5 = self.md5
+            self._old_content_type = self.guess_content_type()
             if clean:
                 try:
                     await util._s3aioclient.delete_object(

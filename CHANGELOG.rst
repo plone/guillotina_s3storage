@@ -1,7 +1,8 @@
 1.0.40 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Customize more of the download
+  [vangheem]
 
 
 1.0.39 (2018-02-22)
