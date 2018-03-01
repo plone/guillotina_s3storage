@@ -372,6 +372,12 @@ class S3File(BaseCloudFile):
             self._mpu = None
             self._upload_file_id = None
 
+        self._old_uri = self.uri
+        self._old_size = self.size
+        self._old_filename = self.filename
+        self._old_md5 = self.md5
+        self._old_content_type = self.guess_content_type()
+
         bucket_name = await util.get_bucket_name()
         self._bucket_name = bucket_name
         self._upload_file_id = self.generate_key(request, context)
@@ -427,11 +433,6 @@ class S3File(BaseCloudFile):
         util = getUtility(IS3BlobStore)
         # It would be great to do on AfterCommit
         if self.uri is not None:
-            self._old_uri = self.uri
-            self._old_size = self.size
-            self._old_filename = self.filename
-            self._old_md5 = self.md5
-            self._old_content_type = self.guess_content_type()
             if clean:
                 try:
                     await util._s3aioclient.delete_object(

@@ -1,7 +1,8 @@
 1.0.41 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Change when we store previous file info
+  [vangheem]
 
 
 1.0.40 (2018-02-22)
