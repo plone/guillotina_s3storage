@@ -1,4 +1,4 @@
-1.0.41 (unreleased)
+1.0.41 (2018-03-01)
 -------------------
 
 - Change when we store previous file info
