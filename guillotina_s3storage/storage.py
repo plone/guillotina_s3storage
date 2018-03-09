@@ -72,6 +72,8 @@ class S3FileManager(object):
             file = S3File(content_type=self.request.content_type)
             self.field.set(self.field.context or self.context, file)
 
+        file.save_previous()
+
         if 'X-UPLOAD-MD5HASH' in self.request.headers:
             file._md5 = self.request.headers['X-UPLOAD-MD5HASH']
         else:
@@ -130,6 +132,9 @@ class S3FileManager(object):
         if not isinstance(file, S3File):
             file = S3File(content_type=self.request.content_type)
             self.field.set(self.field.context or self.context, file)
+
+        file.save_previous()
+
         if 'CONTENT-LENGTH' in self.request.headers:
             file._current_upload = int(self.request.headers['CONTENT-LENGTH'])
         else:
@@ -306,6 +311,8 @@ class S3FileManager(object):
             file = S3File(content_type=content_type)
             self.field.set(self.field.context or self.context, file)
 
+        file.save_previous()
+
         file._size = size
         if filename is None:
             filename = uuid.uuid4().hex
@@ -357,6 +364,13 @@ class S3File(BaseCloudFile):
         await util._s3aioclient.delete_object(
             Bucket=self._bucket_name, Key=old_uri)
 
+    def save_previous(self):
+        self._old_uri = self.uri
+        self._old_size = self.size
+        self._old_filename = self.filename
+        self._old_md5 = self.md5
+        self._old_content_type = self.guess_content_type()
+
     async def init_upload(self, context):
         """Init an upload.
 
@@ -371,12 +385,6 @@ class S3File(BaseCloudFile):
                 await self._abort_multipart()
             self._mpu = None
             self._upload_file_id = None
-
-        self._old_uri = self.uri
-        self._old_size = self.size
-        self._old_filename = self.filename
-        self._old_md5 = self.md5
-        self._old_content_type = self.guess_content_type()
 
         bucket_name = await util.get_bucket_name()
         self._bucket_name = bucket_name
