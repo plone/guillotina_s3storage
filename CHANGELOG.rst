@@ -1,4 +1,4 @@
-1.0.42 (unreleased)
+1.0.42 (2018-03-09)
 -------------------
 
 - Fix saving previous file
