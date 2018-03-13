@@ -1,4 +1,4 @@
-1.0.43 (unreleased)
+1.0.43 (2018-03-13)
 -------------------
 
 - Fix download with custom URI
