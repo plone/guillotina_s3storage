@@ -251,9 +251,12 @@ class S3FileManager(object):
         if disposition is None:
             disposition = self.request.GET.get('disposition', 'attachment')
 
+        file = self.field.get(self.field.context or self.context)
+        if not isinstance(file, S3File):
+            return HTTPNotFound(text='No file found')
+
         if uri is None:
-            file = self.field.get(self.field.context or self.context)
-            if not isinstance(file, S3File) or file.uri is None:
+            if file.uri is None:
                 return HTTPNotFound(text='No file found')
             filename = file.filename
             uri = file.uri

@@ -1,7 +1,8 @@
 1.0.43 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Fix download with custom URI
+  [vangheem]
 
 
 1.0.42 (2018-03-09)
