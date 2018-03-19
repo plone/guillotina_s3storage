@@ -83,16 +83,22 @@ class S3FileStorageManager:
         return cleanup is None or cleanup.should_clean(file=file, field=self.field)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
-    async def _download(self, file):
+    async def _download(self, uri, bucket):
         util = get_utility(IS3BlobStore)
-        return await util._s3aioclient.get_object(
-            Bucket=file._bucket_name, Key=file.uri)
+        if bucket is None:
+            bucket = await util.get_bucket_name()
+        return await util._s3aioclient.get_object(Bucket=bucket, Key=uri)
 
-    async def iter_data(self):
-        file = self.field.get(self.field.context or self.context)
-        if file is None or file.uri is None:
-            raise FileNotFoundException('File not found')
-        downloader = await self._download(file)
+    async def iter_data(self, uri=None):
+        bucket = None
+        if uri is None:
+            file = self.field.get(self.field.context or self.context)
+            if file is None or file.uri is None:
+                raise FileNotFoundException('File not found')
+            else:
+                uri = file.uri
+                bucket = file._bucket_name
+        downloader = await self._download(uri, bucket)
 
         async with downloader['Body'] as stream:
             data = await stream.read(CHUNK_SIZE)
