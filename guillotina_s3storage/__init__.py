@@ -7,5 +7,7 @@ app_settings = {
 }
 
 
-def includeme(root):
+def includeme(root, settings):
     configure.scan('guillotina_s3storage.storage')
+    if 'guillotina_rediscache' in settings.get('applications', []):
+        configure.scan('guillotina_s3storage.redisdm')

@@ -25,11 +25,12 @@ setup(
     packages=find_packages(exclude=['ez_setup']),
     install_requires=[
         'setuptools',
-        'guillotina>=2.3.26',
+        'guillotina>=2.5.0.dev0',
         'aiohttp<2.4.0',
         'boto3',
         'ujson',
-        'aiobotocore'
+        'aiobotocore',
+        'backoff'
     ],
     tests_require=[
         'pytest',

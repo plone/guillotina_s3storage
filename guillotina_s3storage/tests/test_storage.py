@@ -1,13 +1,15 @@
-from guillotina.component import getUtility
+from guillotina.component import get_utility
 from guillotina.exceptions import UnRetryableRequestError
+from guillotina.files import FileManager
 from guillotina.files import MAX_REQUEST_CACHE_SIZE
+from guillotina.files.adapter import DBDataManager
+from guillotina.files.utils import generate_key
 from guillotina.tests.utils import create_content
 from guillotina.tests.utils import login
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.storage import CHUNK_SIZE
-from guillotina_s3storage.storage import S3File
 from guillotina_s3storage.storage import S3FileField
-from guillotina_s3storage.storage import S3FileManager
+from guillotina_s3storage.storage import S3FileStorageManager
 from hashlib import md5
 from zope.interface import Interface
 
@@ -38,14 +40,14 @@ class IContent(Interface):
 
 
 async def _cleanup():
-    util = getUtility(IS3BlobStore)
+    util = get_utility(IS3BlobStore)
     async for item in util.iterate_bucket():
         await util._s3aioclient.delete_object(
             Bucket=await util.get_bucket_name(), Key=item['Key'])
 
 
 async def get_all_objects():
-    util = getUtility(IS3BlobStore)
+    util = get_utility(IS3BlobStore)
     items = []
     async for item in util.iterate_bucket():
         items.append(item)
@@ -55,7 +57,7 @@ async def get_all_objects():
 async def test_get_storage_object(dummy_request):
     request = dummy_request  # noqa
     request._container_id = 'test-container'
-    util = getUtility(IS3BlobStore)
+    util = get_utility(IS3BlobStore)
     assert await util.get_bucket_name() is not None
 
 
@@ -76,19 +78,20 @@ async def test_store_file_in_cloud(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.upload()
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
 
-    assert ob.file.content_type == b'image/gif'
+    assert ob.file.content_type == 'image/gif'
     assert ob.file.filename == 'test.gif'
     assert ob.file._size == len(_test_gif)
     assert ob.file.md5 is not None
     assert ob._p_oid in ob.file.uri
 
     assert len(await get_all_objects()) == 1
-    await ob.file.delete_upload()
+    gmng = S3FileStorageManager(ob, request, IContent['file'].bind(ob))
+    await gmng.delete_upload(ob.file.uri)
     assert len(await get_all_objects()) == 0
 
 
@@ -109,12 +112,12 @@ async def test_store_file_uses_cached_request_data_on_retry(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.upload()
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
 
-    assert ob.file.content_type == b'image/gif'
+    assert ob.file.content_type == 'image/gif'
     assert ob.file.filename == 'test.gif'
     assert ob.file._size == len(_test_gif)
     assert ob.file.md5 is not None
@@ -124,13 +127,14 @@ async def test_store_file_uses_cached_request_data_on_retry(dummy_request):
     request._retry_attempt = 1
     await mng.upload()
 
-    assert ob.file.content_type == b'image/gif'
+    assert ob.file.content_type == 'image/gif'
     assert ob.file.filename == 'test.gif'
     assert ob.file._size == len(_test_gif)
 
     # should delete existing and reupload
     assert len(await get_all_objects()) == 1
-    await ob.file.delete_upload()
+    gmng = S3FileStorageManager(ob, request, IContent['file'].bind(ob))
+    await gmng.delete_upload(ob.file.uri)
     assert len(await get_all_objects()) == 0
 
 
@@ -154,18 +158,19 @@ async def test_store_file_in_cloud_using_tus(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.tus_create()
     await mng.tus_patch()
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
 
-    assert ob.file.content_type == b'image/gif'
+    assert ob.file.content_type == 'image/gif'
     assert ob.file.filename == 'test.gif'
     assert ob.file._size == len(_test_gif)
 
     assert len(await get_all_objects()) == 1
-    await ob.file.delete_upload()
+    gmng = S3FileStorageManager(ob, request, IContent['file'].bind(ob))
+    await gmng.delete_upload(ob.file.uri)
     assert len(await get_all_objects()) == 0
 
 
@@ -191,7 +196,7 @@ async def test_multipart_upload_with_tus(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.tus_create()
 
     chunk = file_data[:5 * 1024 * 1024]
@@ -217,12 +222,13 @@ async def test_multipart_upload_with_tus(dummy_request):
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
 
-    assert ob.file.content_type == b'image/gif'
+    assert ob.file.content_type == 'image/gif'
     assert ob.file.filename == 'test.gif'
     assert ob.file._size == len(file_data)
 
     assert len(await get_all_objects()) == 1
-    await ob.file.delete_upload()
+    gmng = S3FileStorageManager(ob, request, IContent['file'].bind(ob))
+    await gmng.delete_upload(ob.file.uri)
     assert len(await get_all_objects()) == 0
 
 
@@ -248,7 +254,7 @@ async def test_large_file_with_upload(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
     request._payload = FakeContentReader(file_data)
     request._cache_data = b''
     request._last_read_pos = 0
@@ -257,12 +263,13 @@ async def test_large_file_with_upload(dummy_request):
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
 
-    assert ob.file.content_type == b'image/gif'
+    assert ob.file.content_type == 'image/gif'
     assert ob.file.filename == 'test.gif'
     assert ob.file._size == len(file_data)
 
     assert len(await get_all_objects()) == 1
-    await ob.file.delete_upload()
+    gmng = S3FileStorageManager(ob, request, IContent['file'].bind(ob))
+    await gmng.delete_upload(ob.file.uri)
     assert len(await get_all_objects()) == 0
 
 
@@ -288,7 +295,7 @@ async def test_multipart_upload_with_tus_and_tid_conflict(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.tus_create()
 
     chunk = file_data[:5 * 1024 * 1024]
@@ -302,9 +309,9 @@ async def test_multipart_upload_with_tus_and_tid_conflict(dummy_request):
     await mng.tus_patch()
 
     # do this chunk over again...
-    ob.file._current_upload -= len(chunk)
-    ob.file._block -= 1
-    ob.file._multipart['Parts'] = ob.file._multipart['Parts'][:-1]
+    ob.__uploads__['file']['offset'] -= len(chunk)
+    ob.__uploads__['file']['_block'] -= 1
+    ob.__uploads__['file']['_multipart']['Parts'] = ob.__uploads__['file']['_multipart']['Parts'][:-1]  # noqa
     request._payload = FakeContentReader(chunk)
     request._cache_data = b''
     request._last_read_pos = 0
@@ -323,12 +330,13 @@ async def test_multipart_upload_with_tus_and_tid_conflict(dummy_request):
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
 
-    assert ob.file.content_type == b'image/gif'
+    assert ob.file.content_type == 'image/gif'
     assert ob.file.filename == 'test.gif'
     assert ob.file._size == len(file_data)
 
     assert len(await get_all_objects()) == 1
-    await ob.file.delete_upload()
+    gmng = S3FileStorageManager(ob, request, IContent['file'].bind(ob))
+    await gmng.delete_upload(ob.file.uri)
     assert len(await get_all_objects()) == 0
 
 
@@ -336,15 +344,14 @@ def test_gen_key(dummy_request):
     request = dummy_request  # noqa
     request._container_id = 'test-container'
     ob = create_content()
-    fi = S3File()
-    key = fi.generate_key(request, ob)
+    key = generate_key(request, ob)
     assert key.startswith('test-container/')
     last = key.split('/')[-1]
     assert '::' in last
     assert last.split('::')[0] == ob._p_oid
 
 
-async def test_rename(dummy_request):
+async def test_copy(dummy_request):
     request = dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -361,15 +368,28 @@ async def test_rename(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.upload()
-
-    await ob.file.rename_cloud_file('test-container/foobar')
-    assert ob.file.uri == 'test-container/foobar'
 
     items = await get_all_objects()
     assert len(items) == 1
-    assert items[0]['Key'] == 'test-container/foobar'
+
+    new_ob = create_content()
+    new_ob.file = None
+    gmng = S3FileStorageManager(ob, request, IContent['file'].bind(ob))
+    dm = DBDataManager(gmng)
+    await dm.load()
+    new_gmng = S3FileStorageManager(new_ob, request, IContent['file'].bind(new_ob))
+    new_dm = DBDataManager(new_gmng)
+    await new_dm.load()
+    await gmng.copy(new_gmng, new_dm)
+
+    new_ob.file.content_type == ob.file.content_type
+    new_ob.file.size == ob.file.size
+    new_ob.file.uri != ob.file.uri
+
+    items = await get_all_objects()
+    assert len(items) == 2
 
 
 async def test_iterate_storage(dummy_request):
@@ -392,10 +412,10 @@ async def test_iterate_storage(dummy_request):
         request._last_read_pos = 0
         ob = create_content()
         ob.file = None
-        mng = S3FileManager(ob, request, IContent['file'])
+        mng = FileManager(ob, request, IContent['file'].bind(ob))
         await mng.upload()
 
-    util = getUtility(IS3BlobStore)
+    util = get_utility(IS3BlobStore)
     items = []
     async for item in util.iterate_bucket():
         items.append(item)
@@ -426,7 +446,7 @@ async def test_download(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.upload()
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
@@ -457,7 +477,7 @@ async def test_raises_not_retryable(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.upload()
 
     request._retry_attempt = 1
@@ -473,15 +493,14 @@ async def test_save_file(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
 
     async def generator():
         yield 5000 * b'x'
-    file = await mng.save_file(generator, 'application/data', 5000)
-    assert file.size == 5000
+    await mng.save_file(generator, content_type='application/data')
+    assert ob.file.size == 5000
     items = await get_all_objects()
     assert len(items) == 1
-    assert file._one_tus_shoot
 
 
 async def test_save_file_multipart(dummy_request):
@@ -492,13 +511,12 @@ async def test_save_file_multipart(dummy_request):
 
     ob = create_content()
     ob.file = None
-    mng = S3FileManager(ob, request, IContent['file'])
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
 
     async def generator():
         yield CHUNK_SIZE * b'x'
         yield CHUNK_SIZE * b'x'
-    file = await mng.save_file(generator, 'application/data', CHUNK_SIZE * 2)
-    assert file.size == CHUNK_SIZE * 2
+    await mng.save_file(generator, content_type='application/data')
+    assert ob.file.size == CHUNK_SIZE * 2
     items = await get_all_objects()
     assert len(items) == 1
-    assert not file._one_tus_shoot
