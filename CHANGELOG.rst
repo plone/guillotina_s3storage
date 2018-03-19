@@ -1,4 +1,4 @@
-1.1.0 (unreleased)
+1.1.0 (2018-03-19)
 ------------------
 
 - Upgrade to new file manager API for Guillotina 2.5.0
