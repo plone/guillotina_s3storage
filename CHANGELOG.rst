@@ -1,4 +1,4 @@
-1.1.1 (unreleased)
+1.1.1 (2018-03-19)
 ------------------
 
 - Be able to use `iter_data` with custom uri
