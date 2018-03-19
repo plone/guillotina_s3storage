@@ -1,7 +1,8 @@
-1.0.44 (unreleased)
--------------------
+1.1.0 (unreleased)
+------------------
 
-- Nothing changed yet.
+- Upgrade to new file manager API for Guillotina 2.5.0
+  [vangheem]
 
 
 1.0.43 (2018-03-13)
