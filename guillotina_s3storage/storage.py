@@ -286,6 +286,7 @@ class S3FileManager(object):
 
             while data:
                 resp.write(data)
+                await resp.drain()
                 data = await stream.read(CHUNK_SIZE)
 
         return resp
