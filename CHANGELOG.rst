@@ -1,4 +1,4 @@
-1.0.44 (unreleased)
+1.0.44 (2018-03-21)
 -------------------
 
 - Make sure to drain the response when downloading
