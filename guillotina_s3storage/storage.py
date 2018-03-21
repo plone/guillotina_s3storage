@@ -100,6 +100,8 @@ class S3FileStorageManager:
                 bucket = file._bucket_name
         downloader = await self._download(uri, bucket)
 
+        # we do not want to timeout ever from this...
+        # downloader['Body'].set_socket_timeout(999999)
         async with downloader['Body'] as stream:
             data = await stream.read(CHUNK_SIZE)
             while True:
@@ -139,28 +141,24 @@ class S3FileStorageManager:
         if upload_file_id is not None:
             if dm.get('_mpu') is not None:
                 await self._abort_multipart(dm)
-            await dm.update({
-                '_mpu': None,
-                '_upload_file_id': None
-            })
 
         bucket_name = await util.get_bucket_name()
+        upload_id = generate_key(self.request, self.context)
         await dm.update(
             _bucket_name=bucket_name,
-            _upload_file_id=generate_key(self.request, self.context),
+            _upload_file_id=upload_id,
             _multipart={'Parts': []},
             current_upload=0,
-            _block=1
+            _block=1,
+            _mpu=await self._create_multipart(bucket_name, upload_id)
         )
-        await self._create_multipart(dm)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
-    async def _create_multipart(self, dm):
+    async def _create_multipart(self, bucket_name, upload_id):
         util = get_utility(IS3BlobStore)
-        await dm.update(
-            _mpu=await util._s3aioclient.create_multipart_upload(
-                Bucket=dm.get('_bucket_name'),
-                Key=dm.get('_upload_file_id'))
+        return await util._s3aioclient.create_multipart_upload(
+            Bucket=bucket_name,
+            Key=upload_id
         )
 
     async def append(self, dm, iterable, offset) -> int:
