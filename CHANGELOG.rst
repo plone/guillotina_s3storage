@@ -1,4 +1,4 @@
-1.1.2 (unreleased)
+1.1.2 (2018-03-21)
 ------------------
 
 - Prevent calling `dm.update` more than necessary
