@@ -148,7 +148,6 @@ class S3FileStorageManager:
             _bucket_name=bucket_name,
             _upload_file_id=upload_id,
             _multipart={'Parts': []},
-            current_upload=0,
             _block=1,
             _mpu=await self._create_multipart(bucket_name, upload_id)
         )

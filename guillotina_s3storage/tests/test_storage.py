@@ -520,3 +520,90 @@ async def test_save_file_multipart(dummy_request):
     assert ob.file.size == CHUNK_SIZE * 2
     items = await get_all_objects()
     assert len(items) == 1
+
+
+async def test_save_same_chunk_multiple_times(dummy_request):
+    request = dummy_request  # noqa
+    request._container_id = 'test-container'
+    util = get_utility(IS3BlobStore)
+    upload_file_id = 'foobar124'
+    bucket_name = await util.get_bucket_name()
+    multipart = {'Parts': []}
+    block = 1
+    mpu = await util._s3aioclient.create_multipart_upload(
+        Bucket=bucket_name,
+        Key=upload_file_id
+    )
+
+    part = await util._s3aioclient.upload_part(
+        Bucket=bucket_name,
+        Key=upload_file_id,
+        PartNumber=block,
+        UploadId=mpu['UploadId'],
+        Body=b'A' * 1024 * 1024 * 5)
+    multipart['Parts'].append({
+        'PartNumber': block,
+        'ETag': part['ETag']
+    })
+    block += 1
+
+    part = await util._s3aioclient.upload_part(
+        Bucket=bucket_name,
+        Key=upload_file_id,
+        PartNumber=block,
+        UploadId=mpu['UploadId'],
+        Body=b'B' * 1024 * 1024 * 5)
+    multipart['Parts'].append({
+        'PartNumber': block,
+        'ETag': part['ETag']
+    })
+    block += 1
+
+    # a couple more but do not save multipart
+    await util._s3aioclient.upload_part(
+        Bucket=bucket_name,
+        Key=upload_file_id,
+        PartNumber=block,
+        UploadId=mpu['UploadId'],
+        Body=b'C' * 1024 * 1024 * 5)
+    await util._s3aioclient.upload_part(
+        Bucket=bucket_name,
+        Key=upload_file_id,
+        PartNumber=block,
+        UploadId=mpu['UploadId'],
+        Body=b'D' * 1024 * 1024 * 5)
+
+    part = await util._s3aioclient.upload_part(
+        Bucket=bucket_name,
+        Key=upload_file_id,
+        PartNumber=block,
+        UploadId=mpu['UploadId'],
+        Body=b'E' * 1024 * 1024 * 5)
+    multipart['Parts'].append({
+        'PartNumber': block,
+        'ETag': part['ETag']
+    })
+    block += 1
+
+    await util._s3aioclient.complete_multipart_upload(
+        Bucket=bucket_name,
+        Key=upload_file_id,
+        UploadId=mpu['UploadId'],
+        MultipartUpload=multipart)
+
+    ob = await util._s3aioclient.get_object(
+        Bucket=bucket_name,
+        Key=upload_file_id,
+    )
+    data = b''
+    async with ob['Body'] as stream:
+        chunk = await stream.read(CHUNK_SIZE)
+        while True:
+            if not chunk:
+                break
+            data += chunk
+            chunk = await stream.read(CHUNK_SIZE)
+
+    assert data[0:1024 * 1024 * 5] == b'A' * 1024 * 1024 * 5
+    assert data[1024 * 1024 * 5:1024 * 1024 * 10] == b'B' * 1024 * 1024 * 5
+    assert data[1024 * 1024 * 10:1024 * 1024 * 15] == b'E' * 1024 * 1024 * 5
