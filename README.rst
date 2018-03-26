@@ -5,8 +5,17 @@ GUILLOTINA_S3STORAGE
 
 S3 blob storage for guillotina.
 
+The bucket name is built from the container id and the 'bucket' setting::
+
+    "<container>.<bucket>"
 
 Example config.json:
+
+.. code-block:: json
+
+    "applications": [
+        "guillotina_s3storage"
+    ]
 
     "utilities": [{
         "provides": "guillotina_s3storage.interfaces.IS3BlobStore",
@@ -14,8 +23,9 @@ Example config.json:
         "settings": {
           "aws_client_id": "<client id>",
           "aws_client_secret": "<client secret>",
-          "endpoint": null,
-          "ssl": True,
+          "bucket": "<bucket name suffix>",
+          "endpoint_url": null,
+          "ssl": true,
           "verify_ssl": null,
           "region_name": null
         }
