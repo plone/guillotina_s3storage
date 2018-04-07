@@ -1,4 +1,4 @@
-1.1.3 (unreleased)
+1.1.3 (2018-04-07)
 ------------------
 
 - Fix error when uploading empty file
