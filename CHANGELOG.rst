@@ -1,7 +1,8 @@
 1.1.3 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix error when uploading empty file
+  [vangheem]
 
 
 1.1.2 (2018-03-21)

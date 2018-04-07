@@ -210,6 +210,19 @@ class S3FileStorageManager:
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _complete_multipart_upload(self, dm):
         util = get_utility(IS3BlobStore)
+        # if blocks is 0, it means the file is of zero length so we need to
+        # trick it to finish a multiple part with no data.
+        if dm.get('_block') == 1:
+            part = await self._upload_part(dm, b'')
+            multipart = dm.get('_multipart')
+            multipart['Parts'].append({
+                'PartNumber': dm.get('_block'),
+                'ETag': part['ETag']
+            })
+            await dm.update(
+                _multipart=multipart,
+                _block=dm.get('_block') + 1
+            )
         await util._s3aioclient.complete_multipart_upload(
             Bucket=dm.get('_bucket_name'),
             Key=dm.get('_upload_file_id'),

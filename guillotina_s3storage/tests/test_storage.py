@@ -607,3 +607,22 @@ async def test_save_same_chunk_multiple_times(dummy_request):
     assert data[0:1024 * 1024 * 5] == b'A' * 1024 * 1024 * 5
     assert data[1024 * 1024 * 5:1024 * 1024 * 10] == b'B' * 1024 * 1024 * 5
     assert data[1024 * 1024 * 10:1024 * 1024 * 15] == b'E' * 1024 * 1024 * 5
+
+
+async def test_upload_empty_file(dummy_request):
+    request = dummy_request  # noqa
+    login(request)
+    request._container_id = 'test-container'
+    await _cleanup()
+
+    ob = create_content()
+    ob.file = None
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
+
+    async def generator():
+        if False:
+            yield ''
+    await mng.save_file(generator, content_type='application/data')
+    assert ob.file.size == 0
+    items = await get_all_objects()
+    assert len(items) == 1
