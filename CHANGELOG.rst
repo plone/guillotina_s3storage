@@ -1,4 +1,4 @@
-1.1.4 (unreleased)
+1.1.4 (2018-05-09)
 ------------------
 
 - Be able to provide max_pool_connections value in config
