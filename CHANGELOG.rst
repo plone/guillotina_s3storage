@@ -1,7 +1,8 @@
 1.1.4 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Be able to provide max_pool_connections value in config
+  [vangheem]
 
 
 1.1.3 (2018-04-07)

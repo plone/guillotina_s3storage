@@ -265,7 +265,12 @@ class S3BlobStore:
             endpoint_url=settings.get('endpoint_url'),
             verify=settings.get('verify_ssl'),
             use_ssl=settings.get('ssl', True),
-            region_name=settings.get('region_name')
+            region_name=settings.get('region_name'),
+            config=aiobotocore.config.AioConfig(
+                None,
+                max_pool_connections=settings.get(
+                    'max_pool_connections', 30)
+            )
         )
 
         if loop is None:
