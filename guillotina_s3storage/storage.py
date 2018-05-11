@@ -53,6 +53,12 @@ class S3File(BaseCloudFile):
     """File stored in a GCloud, with a filename."""
 
 
+def _is_uploaded_file(file):
+    return (file is not None and
+            isinstance(file, S3File) and
+            file.uri is not None)
+
+
 @implementer(IS3FileField)
 class S3FileField(Object):
     """A NamedBlobFile field."""
@@ -93,7 +99,7 @@ class S3FileStorageManager:
         bucket = None
         if uri is None:
             file = self.field.get(self.field.context or self.context)
-            if file is None or file.uri is None:
+            if not _is_uploaded_file(file):
                 raise FileNotFoundException('File not found')
             else:
                 uri = file.uri
@@ -188,7 +194,7 @@ class S3FileStorageManager:
 
     async def finish(self, dm):
         file = self.field.get(self.field.context or self.context)
-        if file is not None and file.uri is not None:
+        if _is_uploaded_file(file):
             # delete existing file
             if self.should_clean(file):
                 try:
@@ -231,7 +237,7 @@ class S3FileStorageManager:
 
     async def copy(self, to_storage_manager, to_dm):
         file = self.field.get(self.field.context or self.context)
-        if file is None or file.uri is None:
+        if not _is_uploaded_file(file):
             raise HTTPNotFound(reason='To copy a uri must be set on the object')
 
         util = get_utility(IS3BlobStore)
