@@ -1,4 +1,4 @@
-1.1.5 (unreleased)
+1.1.5 (2018-05-12)
 ------------------
 
 - More strict object checks
