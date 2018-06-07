@@ -1,4 +1,4 @@
-2.0.0 (unreleased)
+2.0.0 (2018-06-07)
 ------------------
 
 - Upgrade to guillotina > 4
