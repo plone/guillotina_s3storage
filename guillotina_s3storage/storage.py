@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from aiohttp.web_exceptions import HTTPNotFound
 from guillotina import configure
 from guillotina.component import get_utility
 from guillotina.exceptions import FileNotFoundException
@@ -9,6 +8,7 @@ from guillotina.interfaces import IFileCleanup
 from guillotina.interfaces import IFileStorageManager
 from guillotina.interfaces import IRequest
 from guillotina.interfaces import IResource
+from guillotina.response import HTTPNotFound
 from guillotina.schema import Object
 from guillotina.utils import get_current_request
 from guillotina_s3storage.interfaces import IS3BlobStore
@@ -238,7 +238,9 @@ class S3FileStorageManager:
     async def copy(self, to_storage_manager, to_dm):
         file = self.field.get(self.field.context or self.context)
         if not _is_uploaded_file(file):
-            raise HTTPNotFound(reason='To copy a uri must be set on the object')
+            raise HTTPNotFound(content={
+                "reason": 'To copy a uri must be set on the object'
+            })
 
         util = get_utility(IS3BlobStore)
 
