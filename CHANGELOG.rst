@@ -1,4 +1,4 @@
-1.1.6 (unreleased)
+1.1.6 (2018-06-07)
 ------------------
 
 - Pin version of guillotina
