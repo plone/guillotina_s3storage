@@ -1,7 +1,8 @@
 1.1.6 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Pin version of guillotina
+  [vangheem]
 
 
 1.1.5 (2018-05-12)
