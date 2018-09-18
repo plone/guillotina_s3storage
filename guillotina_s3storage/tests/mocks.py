@@ -48,11 +48,10 @@ class MockedRequest:
 
     @property
     def uuid(self):
-        # We do no store request headers on purpose, as they contain
-        # the credentials
         base = f'{self.method}|{self.url}|'\
                 '{json.dumps({self.data})}|'\
-                '{json.dumps({self.params})}'
+                '{json.dumps({self.params})}|'\
+                '{json.dumps({self.headers})}'
         return hashlib.md5(base.encode('utf-8')).hexdigest()
 
 
