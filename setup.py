@@ -29,16 +29,11 @@ setup(
         'aiohttp<4.0.0',
         'boto3',
         'ujson',
-        'aiobotocore',
+        'aiobotocore==0.9.4',
+        'botocore==1.10.58',
         'backoff'
     ],
-    extras_require={
-        'test': [
-            'pytest<=3.1.0',
-            'pytest-asyncio>=0.8.0',
-            'pytest-aiohttp',
-            'pytest-cov',
-            'pytest-docker-fixtures',
-        ]
-    }
+    tests_require=[
+        'pytest',
+    ]
 )

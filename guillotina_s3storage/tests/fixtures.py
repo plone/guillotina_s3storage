@@ -1,5 +1,10 @@
 from guillotina import testing
+from guillotina_s3storage.tests import mocks
 import os
+import pytest
+
+
+AIOHTTP_MOCKER_ENABLED = False
 
 
 def settings_configurator(settings):
@@ -15,7 +20,7 @@ def settings_configurator(settings):
             "settings": {
                 "bucket": os.environ.get('S3CLOUD_BUCKET', 'testbucket'),
                 "aws_client_id": os.environ.get('S3CLOUD_ID', 'accessKey1'),
-                "aws_client_secret": os.environ.get('S3CLOUD_SECRET', 'verySecretKey1')
+                "aws_client_secret": os.environ.get('S3CLOUD_SECRET', 'verySecretKey1')  # noqa
             }
         }],
         'static': {},
@@ -31,3 +36,18 @@ def settings_configurator(settings):
 
 
 testing.configure_with(settings_configurator)
+
+
+@pytest.fixture(scope='function')
+def aiohttp_mocks():
+    if AIOHTTP_MOCKER_ENABLED:
+        mocks.AiohttpMocker.start()
+        yield mocks.AiohttpMocker
+        mocks.AiohttpMocker.cleanup()
+    else:
+        yield None
+
+
+@pytest.fixture(scope='function')
+def own_dummy_request(dummy_request, aiohttp_mocks):
+    yield dummy_request
