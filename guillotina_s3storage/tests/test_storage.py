@@ -26,12 +26,15 @@ class FakeContentReader:
     def __init__(self, file_data=_test_gif):
         self._file_data = file_data
         self._pointer = 0
+        self.chunks_sent = 0
 
     async def readexactly(self, size):
         data = self._file_data[self._pointer:self._pointer + size]
         self._pointer += len(data)
-        if len(data) < size:
-            raise asyncio.IncompleteReadError(data, None)
+        if data:
+            self.chunks_sent += 1
+        if data and len(data) < size:
+            raise asyncio.IncompleteReadError(data, size)
         return data
 
     def seek(self, pos):
@@ -201,41 +204,15 @@ async def test_multipart_upload_with_tus(own_dummy_request):
     ob.file = None
     mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.tus_create()
-
-    # Upload first 5MB
-    chunk_size = 5 * 1024 * 1024
-    chunk = file_data[:chunk_size]
+    request._payload = FakeContentReader(file_data)
+    request._cache_data = b''
+    request._last_read_pos = 0
     request.headers.update({
-        'Content-Length': len(chunk),
+        'Content-Length': len(file_data),
         'upload-offset': 0
     })
-    request._payload = FakeContentReader(chunk)
-    request._cache_data = b''
-    request._last_read_pos = 0
     await mng.tus_patch()
-
-    # Upload next 5MB chunk
-    chunk = file_data[chunk_size:chunk_size * 2]
-    request.headers.update({
-        'Content-Length': len(chunk),
-        'upload-offset': chunk_size
-    })
-    request._payload = FakeContentReader(chunk)
-    request._cache_data = b''
-    request._last_read_pos = 0
-    await mng.tus_patch()
-
-    # Upload remaining 1MB
-    chunk = file_data[chunk_size * 2:]
-    request.headers.update({
-        'Content-Length': len(chunk),
-        'upload-offset': chunk_size * 2
-    })
-    request._payload = FakeContentReader(chunk)
-    request._cache_data = b''
-    request._last_read_pos = 0
-    await mng.tus_patch()
-
+    assert request._payload.chunks_sent == 3
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
 
@@ -421,17 +398,19 @@ async def test_iterate_storage(own_dummy_request):
         'X-UPLOAD-MD5HASH': md5(_test_gif).hexdigest(),
         'X-UPLOAD-EXTENSION': 'gif',
         'X-UPLOAD-SIZE': len(_test_gif),
-        'X-UPLOAD-FILENAME': 'test.gif'
+        'X-UPLOAD-FILENAME': 'test.gif',
     })
 
     for _ in range(20):
-        request._payload = FakeContentReader()
+        request._payload = FakeContentReader(_test_gif)
+        assert request._payload._pointer == 0
         request._cache_data = b''
         request._last_read_pos = 0
         ob = create_content()
         ob.file = None
         mng = FileManager(ob, request, IContent['file'].bind(ob))
         await mng.upload()
+        request._payload = None
 
     util = get_utility(IS3BlobStore)
     items = []
