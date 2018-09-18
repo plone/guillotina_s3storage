@@ -388,29 +388,33 @@ async def test_copy(own_dummy_request):
 
 
 async def test_iterate_storage(own_dummy_request):
-    request = own_dummy_request  # noqa
+    request = own_dummy_request
     login(request)
     request._container_id = 'test-container'
     await _cleanup()
 
-    request.headers.update({
-        'Content-Type': 'image/gif',
-        'X-UPLOAD-MD5HASH': md5(_test_gif).hexdigest(),
-        'X-UPLOAD-EXTENSION': 'gif',
-        'X-UPLOAD-SIZE': len(_test_gif),
-        'X-UPLOAD-FILENAME': 'test.gif',
-    })
+    for i in range(20):
+        request = own_dummy_request.clone()
+        login(request)
+        request._container_id = 'test-container'
 
-    for _ in range(20):
+        request.headers.update({
+            'Content-Type': 'image/gif',
+            'X-UPLOAD-MD5HASH': md5(_test_gif).hexdigest(),
+            'X-UPLOAD-EXTENSION': 'gif',
+            'X-UPLOAD-SIZE': len(_test_gif),
+            'X-UPLOAD-FILENAME': 'test.gif',
+        })
+
         request._payload = FakeContentReader(_test_gif)
         assert request._payload._pointer == 0
         request._cache_data = b''
         request._last_read_pos = 0
         ob = create_content()
         ob.file = None
+
         mng = FileManager(ob, request, IContent['file'].bind(ob))
         await mng.upload()
-        request._payload = None
 
     util = get_utility(IS3BlobStore)
     items = []
