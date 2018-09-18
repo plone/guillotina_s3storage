@@ -1,8 +1,12 @@
-2.0.1 (unreleased)
+2.0.2 (unreleased)
 ------------------
 
 - Nothing changed yet.
 
+2.0.1 (2018-17-09)
+------------------
+
+- Pinning latest guillotina and aiohttp
 
 2.0.0 (2018-06-07)
 ------------------
