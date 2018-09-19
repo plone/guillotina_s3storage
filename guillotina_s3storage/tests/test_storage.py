@@ -12,6 +12,7 @@ from guillotina_s3storage.storage import S3FileField
 from guillotina_s3storage.storage import S3FileStorageManager
 from hashlib import md5
 from zope.interface import Interface
+from guillotina_s3storage.tests.mocks import AsyncMock
 
 import base64
 import pytest
@@ -60,14 +61,14 @@ async def get_all_objects():
     return items
 
 
-async def test_get_storage_object(own_dummy_request):
+async def test_get_storage_object(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     request._container_id = 'test-container'
     util = get_utility(IS3BlobStore)
     assert await util.get_bucket_name() is not None
 
 
-async def test_store_file_in_cloud(own_dummy_request):
+async def test_store_file_in_cloud(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -101,7 +102,7 @@ async def test_store_file_in_cloud(own_dummy_request):
     assert len(await get_all_objects()) == 0
 
 
-async def test_store_file_uses_cached_request_data_on_retry(own_dummy_request):
+async def test_store_file_uses_cached_request_data_on_retry(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -144,7 +145,7 @@ async def test_store_file_uses_cached_request_data_on_retry(own_dummy_request):
     assert len(await get_all_objects()) == 0
 
 
-async def test_store_file_in_cloud_using_tus(own_dummy_request):
+async def test_store_file_in_cloud_using_tus(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -180,7 +181,7 @@ async def test_store_file_in_cloud_using_tus(own_dummy_request):
     assert len(await get_all_objects()) == 0
 
 
-async def test_multipart_upload_with_tus(own_dummy_request):
+async def test_multipart_upload_with_tus(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -204,15 +205,27 @@ async def test_multipart_upload_with_tus(own_dummy_request):
     ob.file = None
     mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.tus_create()
-    request._payload = FakeContentReader(file_data)
-    request._cache_data = b''
-    request._last_read_pos = 0
+
+    chunk = file_data[:5 * 1024 * 1024]
     request.headers.update({
-        'Content-Length': len(file_data),
+        'Content-Length': len(chunk),
         'upload-offset': 0
     })
+    request._payload = FakeContentReader(chunk)
+    request._cache_data = b''
+    request._last_read_pos = 0
     await mng.tus_patch()
-    assert request._payload.chunks_sent == 3
+
+    chunk = file_data[5 * 1024 * 1024:]
+    request.headers.update({
+        'Content-Length': len(chunk),
+        'upload-offset': 5 * 1024 * 1024
+    })
+    request._payload = FakeContentReader(chunk)
+    request._cache_data = b''
+    request._last_read_pos = 0
+    await mng.tus_patch()
+
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
 
@@ -226,7 +239,7 @@ async def test_multipart_upload_with_tus(own_dummy_request):
     assert len(await get_all_objects()) == 0
 
 
-async def test_large_file_with_upload(own_dummy_request):
+async def test_large_file_with_upload(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -267,7 +280,7 @@ async def test_large_file_with_upload(own_dummy_request):
     assert len(await get_all_objects()) == 0
 
 
-async def test_multipart_upload_with_tus_and_tid_conflict(own_dummy_request):
+async def test_multipart_upload_with_tus_and_tid_conflict(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -334,7 +347,7 @@ async def test_multipart_upload_with_tus_and_tid_conflict(own_dummy_request):
     assert len(await get_all_objects()) == 0
 
 
-def test_gen_key(own_dummy_request):
+def test_gen_key(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     request._container_id = 'test-container'
     ob = create_content()
@@ -345,7 +358,7 @@ def test_gen_key(own_dummy_request):
     assert last.split('::')[0] == ob._p_oid
 
 
-async def test_copy(own_dummy_request):
+async def test_copy(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -387,32 +400,26 @@ async def test_copy(own_dummy_request):
     assert len(items) == 2
 
 
-async def test_iterate_storage(own_dummy_request):
-    request = own_dummy_request
+async def test_iterate_storage(own_dummy_request, s3_server):
+    request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
     await _cleanup()
 
-    for i in range(20):
-        request = own_dummy_request.clone()
-        login(request)
-        request._container_id = 'test-container'
+    request.headers.update({
+        'Content-Type': 'image/gif',
+        'X-UPLOAD-MD5HASH': md5(_test_gif).hexdigest(),
+        'X-UPLOAD-EXTENSION': 'gif',
+        'X-UPLOAD-SIZE': len(_test_gif),
+        'X-UPLOAD-FILENAME': 'test.gif'
+    })
 
-        request.headers.update({
-            'Content-Type': 'image/gif',
-            'X-UPLOAD-MD5HASH': md5(_test_gif).hexdigest(),
-            'X-UPLOAD-EXTENSION': 'gif',
-            'X-UPLOAD-SIZE': len(_test_gif),
-            'X-UPLOAD-FILENAME': 'test.gif',
-        })
-
-        request._payload = FakeContentReader(_test_gif)
-        assert request._payload._pointer == 0
+    for idx in range(20):
+        request._payload = FakeContentReader()
         request._cache_data = b''
         request._last_read_pos = 0
         ob = create_content()
         ob.file = None
-
         mng = FileManager(ob, request, IContent['file'].bind(ob))
         await mng.upload()
 
@@ -425,7 +432,7 @@ async def test_iterate_storage(own_dummy_request):
     await _cleanup()
 
 
-async def test_download(own_dummy_request):
+async def test_download(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -444,19 +451,18 @@ async def test_download(own_dummy_request):
         'X-UPLOAD-FILENAME': 'test.gif'
     })
     request._payload = FakeContentReader(file_data)
-
+    request._payload_writer = AsyncMock()
     ob = create_content()
     ob.file = None
     mng = FileManager(ob, request, IContent['file'].bind(ob))
     await mng.upload()
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
-
     resp = await mng.download()
     assert resp.content_length == len(file_data)
 
 
-async def test_raises_not_retryable(own_dummy_request):
+async def test_raises_not_retryable(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -486,7 +492,7 @@ async def test_raises_not_retryable(own_dummy_request):
         await mng.upload()
 
 
-async def test_save_file(own_dummy_request):
+async def test_save_file(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -504,7 +510,7 @@ async def test_save_file(own_dummy_request):
     assert len(items) == 1
 
 
-async def test_save_file_multipart(own_dummy_request):
+async def test_save_file_multipart(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -523,7 +529,7 @@ async def test_save_file_multipart(own_dummy_request):
     assert len(items) == 1
 
 
-async def test_save_same_chunk_multiple_times(own_dummy_request):
+async def test_save_same_chunk_multiple_times(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     request._container_id = 'test-container'
     util = get_utility(IS3BlobStore)
@@ -610,7 +616,7 @@ async def test_save_same_chunk_multiple_times(own_dummy_request):
     assert data[1024 * 1024 * 10:1024 * 1024 * 15] == b'E' * 1024 * 1024 * 5
 
 
-async def test_upload_empty_file(own_dummy_request):
+async def test_upload_empty_file(own_dummy_request, s3_server):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
