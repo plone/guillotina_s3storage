@@ -12,6 +12,7 @@ cache:
     - eggs
 install:
   - pip install -e .[test]
+  - pip install -r dev-requirements.txt
   - pip install flake8 codecov
   - sleep 5
 script:
