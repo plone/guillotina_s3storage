@@ -26,14 +26,17 @@ setup(
     install_requires=[
         'setuptools',
         'guillotina>=4.0.0,<5.0.0',
-        'aiohttp<4.0.0',
-        'boto3',
+        'aiohttp>3.0.0,<4.0.0',
+        'boto3==1.7.58',
         'ujson',
         'aiobotocore==0.9.4',
         'botocore==1.10.58',
         'backoff'
     ],
-    tests_require=[
-        'pytest',
-    ]
+    extras_require={
+        'test':[
+            'pytest',
+            'pytest-aiohttp',
+        ]
+    }
 )
