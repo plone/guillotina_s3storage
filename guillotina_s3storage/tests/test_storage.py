@@ -61,14 +61,14 @@ async def get_all_objects():
     return items
 
 
-async def test_get_storage_object(own_dummy_request, s3_server):
+async def test_get_storage_object(own_dummy_request):
     request = own_dummy_request  # noqa
     request._container_id = 'test-container'
     util = get_utility(IS3BlobStore)
     assert await util.get_bucket_name() is not None
 
 
-async def test_store_file_in_cloud(own_dummy_request, s3_server):
+async def test_store_file_in_cloud(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -102,7 +102,7 @@ async def test_store_file_in_cloud(own_dummy_request, s3_server):
     assert len(await get_all_objects()) == 0
 
 
-async def test_store_file_uses_cached_request_data_on_retry(own_dummy_request, s3_server):
+async def test_store_file_uses_cached_request_data_on_retry(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -145,7 +145,7 @@ async def test_store_file_uses_cached_request_data_on_retry(own_dummy_request, s
     assert len(await get_all_objects()) == 0
 
 
-async def test_store_file_in_cloud_using_tus(own_dummy_request, s3_server):
+async def test_store_file_in_cloud_using_tus(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -181,7 +181,7 @@ async def test_store_file_in_cloud_using_tus(own_dummy_request, s3_server):
     assert len(await get_all_objects()) == 0
 
 
-async def test_multipart_upload_with_tus(own_dummy_request, s3_server):
+async def test_multipart_upload_with_tus(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -239,7 +239,7 @@ async def test_multipart_upload_with_tus(own_dummy_request, s3_server):
     assert len(await get_all_objects()) == 0
 
 
-async def test_large_file_with_upload(own_dummy_request, s3_server):
+async def test_large_file_with_upload(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -280,7 +280,7 @@ async def test_large_file_with_upload(own_dummy_request, s3_server):
     assert len(await get_all_objects()) == 0
 
 
-async def test_multipart_upload_with_tus_and_tid_conflict(own_dummy_request, s3_server):
+async def test_multipart_upload_with_tus_and_tid_conflict(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -347,7 +347,7 @@ async def test_multipart_upload_with_tus_and_tid_conflict(own_dummy_request, s3_
     assert len(await get_all_objects()) == 0
 
 
-def test_gen_key(own_dummy_request, s3_server):
+def test_gen_key(own_dummy_request):
     request = own_dummy_request  # noqa
     request._container_id = 'test-container'
     ob = create_content()
@@ -358,7 +358,7 @@ def test_gen_key(own_dummy_request, s3_server):
     assert last.split('::')[0] == ob._p_oid
 
 
-async def test_copy(own_dummy_request, s3_server):
+async def test_copy(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -400,7 +400,7 @@ async def test_copy(own_dummy_request, s3_server):
     assert len(items) == 2
 
 
-async def test_iterate_storage(own_dummy_request, s3_server):
+async def test_iterate_storage(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -432,7 +432,7 @@ async def test_iterate_storage(own_dummy_request, s3_server):
     await _cleanup()
 
 
-async def test_download(own_dummy_request, s3_server):
+async def test_download(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -462,7 +462,7 @@ async def test_download(own_dummy_request, s3_server):
     assert resp.content_length == len(file_data)
 
 
-async def test_raises_not_retryable(own_dummy_request, s3_server):
+async def test_raises_not_retryable(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -492,7 +492,7 @@ async def test_raises_not_retryable(own_dummy_request, s3_server):
         await mng.upload()
 
 
-async def test_save_file(own_dummy_request, s3_server):
+async def test_save_file(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -510,7 +510,7 @@ async def test_save_file(own_dummy_request, s3_server):
     assert len(items) == 1
 
 
-async def test_save_file_multipart(own_dummy_request, s3_server):
+async def test_save_file_multipart(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
@@ -529,7 +529,7 @@ async def test_save_file_multipart(own_dummy_request, s3_server):
     assert len(items) == 1
 
 
-async def test_save_same_chunk_multiple_times(own_dummy_request, s3_server):
+async def test_save_same_chunk_multiple_times(own_dummy_request):
     request = own_dummy_request  # noqa
     request._container_id = 'test-container'
     util = get_utility(IS3BlobStore)
@@ -616,7 +616,7 @@ async def test_save_same_chunk_multiple_times(own_dummy_request, s3_server):
     assert data[1024 * 1024 * 10:1024 * 1024 * 15] == b'E' * 1024 * 1024 * 5
 
 
-async def test_upload_empty_file(own_dummy_request, s3_server):
+async def test_upload_empty_file(own_dummy_request):
     request = own_dummy_request  # noqa
     login(request)
     request._container_id = 'test-container'
