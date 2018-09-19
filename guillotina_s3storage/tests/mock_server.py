@@ -146,12 +146,17 @@ def stop_process(process):
 
 @pytest.yield_fixture(scope="session")
 def s3_server():
+    """
+    XXX Note: uncomment lines below to test locally
+    """
+
     host = "localhost"
     port = 5000
     url = "http://{host}:{port}".format(host=host, port=port)
-    process = start_service('s3', host, port)
+    # process = start_service('s3', host, port)
 
     try:
         yield url
     finally:
-        stop_process(process)
+        # stop_process(process)
+        pass
