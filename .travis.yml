@@ -12,7 +12,7 @@ cache:
   directories:
     - eggs
 install:
-  - sudo rm -f /etc/boto.cfg
+  - sudo mv /etc/boto.cfg /etc/boto.cfg.bak
   - pip install -e .[test]
   - pip install -r dev-requirements.txt
   - pip install flake8 codecov pytest-cov
@@ -23,4 +23,5 @@ script:
     - flake8 guillotina_s3storage --config=setup.cfg
     - pytest -s --cov=guillotina_s3storage -s --tb=native -v --cov-report term-missing --cov-append ./guillotina_s3storage
 after_success:
+  - sudo mv /etc/boto.cfg.bak /etc/boto.cfg
   - codecov
