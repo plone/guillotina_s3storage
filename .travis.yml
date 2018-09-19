@@ -17,7 +17,7 @@ install:
   - sleep 5
 before_script:
   - python3 -m moto.server -H 127.0.0.1 -p 5000 s3 &
-  - sleep 2
+  - sleep 30
 script:
     - flake8 guillotina_s3storage --config=setup.cfg
     - pytest -s --cov=guillotina_s3storage -s --tb=native -v --cov-report term-missing --cov-append ./guillotina_s3storage
