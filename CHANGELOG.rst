@@ -1,8 +1,8 @@
 2.0.1 (unreleased)
 ------------------
 
-- Nothing changed yet.
-
+- Pinning latest guillotina and aiohttp
+  [lferran,dmanchon]
 
 2.0.0 (2018-06-07)
 ------------------
