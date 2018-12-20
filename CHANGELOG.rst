@@ -1,7 +1,8 @@
 2.0.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Removed unused code [masipcat]
+- Fix S3BlobStore.finalize() crash [masipcat]
 
 
 2.0.1 (2018-09-20)
