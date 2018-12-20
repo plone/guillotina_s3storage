@@ -20,7 +20,6 @@ import aiobotocore
 import aiohttp
 import asyncio
 import backoff
-import boto3
 import botocore
 import logging
 
@@ -293,9 +292,6 @@ class S3BlobStore:
 
         self._bucket_name = settings['bucket']
 
-        # right now, only used for upload_fileobj in executor
-        self._s3client = boto3.client('s3', **opts)
-
     async def get_bucket_name(self):
         request = get_current_request()
         bucket_name = request._container_id.lower() + '.' + self._bucket_name
@@ -322,7 +318,7 @@ class S3BlobStore:
         self.app = app
 
     async def finalize(self, app=None):
-        self._s3aiosession.close()
+        await self._s3aioclient.close()
 
     async def iterate_bucket(self):
         req = get_current_request()
