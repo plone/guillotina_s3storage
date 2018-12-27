@@ -33,7 +33,7 @@ setup(
         'backoff'
     ],
     extras_require={
-        'test':[
+        'test': [
             'pytest',
             'pytest-aiohttp',
         ]

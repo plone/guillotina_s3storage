@@ -17,16 +17,18 @@ Example config.json:
         "guillotina_s3storage"
     ]
 
-    "utilities": [{
-        "provides": "guillotina_s3storage.interfaces.IS3BlobStore",
-        "factory": "guillotina_s3storage.storage.S3BlobStore",
-        "settings": {
-          "aws_client_id": "<client id>",
-          "aws_client_secret": "<client secret>",
-          "bucket": "<bucket name suffix>",
-          "endpoint_url": null,
-          "ssl": true,
-          "verify_ssl": null,
-          "region_name": null
+    "load_utilities": {
+        "s3": {
+            "provides": "guillotina_s3storage.interfaces.IS3BlobStore",
+            "factory": "guillotina_s3storage.storage.S3BlobStore",
+            "settings": {
+                "aws_client_id": "<client id>",
+                "aws_client_secret": "<client secret>",
+                "bucket": "<bucket name suffix>",
+                "endpoint_url": null,
+                "ssl": true,
+                "verify_ssl": null,
+                "region_name": null
+            }
         }
-    }]
+    }

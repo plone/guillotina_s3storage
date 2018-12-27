@@ -1,6 +1,7 @@
 2.0.2 (unreleased)
 ------------------
 
+- implement exists for head requests [vangheem]
 - Removed unused code [masipcat]
 - Fix S3BlobStore.finalize() crash [masipcat]
 

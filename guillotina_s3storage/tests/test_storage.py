@@ -633,3 +633,42 @@ async def test_upload_empty_file(own_dummy_request):
     assert ob.file.size == 0
     items = await get_all_objects()
     assert len(items) == 1
+
+
+async def test_file_exists(own_dummy_request):
+    request = own_dummy_request  # noqa
+    login(request)
+    request._container_id = 'test-container'
+    await _cleanup()
+
+    request.headers.update({
+        'Content-Type': 'image/gif',
+        'X-UPLOAD-MD5HASH': md5(_test_gif).hexdigest(),
+        'X-UPLOAD-EXTENSION': 'gif',
+        'X-UPLOAD-SIZE': len(_test_gif),
+        'X-UPLOAD-FILENAME': 'test.gif'
+    })
+    request._payload = FakeContentReader()
+
+    ob = create_content()
+    ob.file = None
+    mng = FileManager(ob, request, IContent['file'].bind(ob))
+    await mng.upload()
+    assert ob.file._upload_file_id is None
+    assert ob.file.uri is not None
+
+    assert ob.file.content_type == 'image/gif'
+    assert ob.file.filename == 'test.gif'
+    assert ob.file._size == len(_test_gif)
+    assert ob.file.md5 is not None
+    assert ob._p_oid in ob.file.uri
+
+    assert len(await get_all_objects()) == 1
+    s3mng = S3FileStorageManager(ob, request, IContent['file'].bind(ob))
+
+    assert await s3mng.exists()
+
+    await s3mng.delete_upload(ob.file.uri)
+    assert len(await get_all_objects()) == 0
+
+    assert not await s3mng.exists()
