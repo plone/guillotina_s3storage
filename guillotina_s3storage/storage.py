@@ -243,7 +243,13 @@ class S3FileStorageManager:
             uri = file.uri
             bucket = file._bucket_name
         util = get_utility(IS3BlobStore)
-        return await util._s3aioclient.get_object(Bucket=bucket, Key=uri) is not None
+        try:
+            return await util._s3aioclient.get_object(
+                Bucket=bucket, Key=uri) is not None
+        except botocore.exceptions.ClientError as ex:
+            if ex.response['Error']['Code'] == 'NoSuchKey':
+                return False
+            raise
 
     async def copy(self, to_storage_manager, to_dm):
         file = self.field.get(self.field.context or self.context)
