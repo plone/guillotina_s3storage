@@ -25,7 +25,7 @@ setup(
     packages=find_packages(exclude=['ez_setup']),
     install_requires=[
         'setuptools',
-        'guillotina>=4.0.0,<5.0.0',
+        'guillotina>=4.4.0,<5.0.0',
         'aiohttp>3.0.0,<4.0.0',
         'ujson',
         'aiobotocore==0.9.4',
