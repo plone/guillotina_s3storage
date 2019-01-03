@@ -1,6 +1,7 @@
 2.0.2 (unreleased)
 ------------------
 
+- Use minio fixture as S3 server
 - Removed unused code [masipcat]
 - Fix S3BlobStore.finalize() crash [masipcat]
 
@@ -10,6 +11,7 @@
 
 - Pinning latest guillotina and aiohttp
   [lferran,dmanchon]
+
 
 2.0.0 (2018-06-07)
 ------------------

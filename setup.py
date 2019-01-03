@@ -14,7 +14,7 @@ setup(
     ],
     author='Ramon Navarro Bosch',
     author_email='ramon@plone.org',
-    keywords='async aiohtt guillotina s3',
+    keywords='async aiohttp guillotina s3',
     url='https://pypi.python.org/pypi/guillotina_s3storage',
     license='GPL version 3',
     setup_requires=[
@@ -36,6 +36,7 @@ setup(
         'test':[
             'pytest',
             'pytest-aiohttp',
+            'pytest-docker-fixtures'
         ]
     }
 )
