@@ -122,7 +122,7 @@ class S3FileStorageManager:
         if uri is not None:
             try:
                 await util._s3aioclient.delete_object(Bucket=bucket, Key=uri)
-            except botocore.exceptions.ClientError as e:
+            except botocore.exceptions.ClientError:
                 log.warn('Error deleting object', exc_info=True)
         else:
             raise AttributeError('No valid uri')
@@ -198,7 +198,7 @@ class S3FileStorageManager:
             if self.should_clean(file):
                 try:
                     await self.delete_upload(file.uri, file._bucket_name)
-                except botocore.exceptions.ClientError as e:
+                except botocore.exceptions.ClientError:
                     log.error(f'Referenced key {file.uri} could not be found', exc_info=True)
                     log.warn('Error deleting object', exc_info=True)
 
