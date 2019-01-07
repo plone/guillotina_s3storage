@@ -1,7 +1,8 @@
 2.0.2 (unreleased)
 ------------------
 
-- Use minio fixture as S3 server
+- Use minio fixture as S3 server [masipcat]
+- implement exists for head requests [vangheem]
 - Removed unused code [masipcat]
 - Fix S3BlobStore.finalize() crash [masipcat]
 

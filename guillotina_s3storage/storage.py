@@ -234,6 +234,23 @@ class S3FileStorageManager:
             UploadId=dm.get('_mpu')['UploadId'],
             MultipartUpload=dm.get('_multipart'))
 
+    async def exists(self):
+        bucket = None
+        file = self.field.get(self.field.context or self.context)
+        if not _is_uploaded_file(file):
+            return False
+        else:
+            uri = file.uri
+            bucket = file._bucket_name
+        util = get_utility(IS3BlobStore)
+        try:
+            return await util._s3aioclient.get_object(
+                Bucket=bucket, Key=uri) is not None
+        except botocore.exceptions.ClientError as ex:
+            if ex.response['Error']['Code'] == 'NoSuchKey':
+                return False
+            raise
+
     async def copy(self, to_storage_manager, to_dm):
         file = self.field.get(self.field.context or self.context)
         if not _is_uploaded_file(file):
