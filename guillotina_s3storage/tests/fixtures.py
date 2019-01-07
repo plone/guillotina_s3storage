@@ -16,14 +16,14 @@ def settings_configurator(settings):
         "factory": "guillotina_s3storage.storage.S3BlobStore",
         "settings": {
             "bucket": os.environ.get('S3CLOUD_BUCKET', 'testbucket'),
-            "aws_client_id": os.environ.get('S3CLOUD_ID', 'xxx'),
-            "aws_client_secret": os.environ.get('S3CLOUD_SECRET', 'xxx')  # noqa
+            "aws_client_id": os.environ.get('S3CLOUD_ID', 'x' * 10),
+            "aws_client_secret": os.environ.get('S3CLOUD_SECRET', 'x' * 10)  # noqa
         }
     }
 
     if 'S3CLOUD_ID' not in os.environ:
         settings['load_utilities']['s3']['settings'].update({
-            'endpoint_url': 'http://localhost:5000',
+            'endpoint_url': 'http://localhost:19000',
             'verify_ssl': False,
             'ssl': False,
         })
@@ -39,6 +39,6 @@ class PatchedBaseRequest(aiohttp.web_request.Request):
 
 
 @pytest.fixture(scope='function')
-def own_dummy_request(dummy_request):
+def own_dummy_request(dummy_request, minio):
     dummy_request.__class__ = PatchedBaseRequest
     yield dummy_request

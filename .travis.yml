@@ -8,20 +8,22 @@ sudo: required
 env:
   - DATABASE=DUMMY
 
+services:
+  - docker
+
 cache:
   directories:
     - eggs
 install:
   - sudo mv /etc/boto.cfg /etc/boto.cfg.bak
   - pip install -e .[test]
-  - pip install -r dev-requirements.txt
   - pip install flake8 codecov pytest-cov
 before_script:
-  - python3 -m moto.server -H 127.0.0.1 -p 5000 s3 &
-  - sleep 10
+  - docker run --rm -d -p 19000:9000 --name minio -e MINIO_ACCESS_KEY=xxxxxxxxxx -e MINIO_SECRET_KEY=xxxxxxxxxx minio/minio server /data
+  - sleep 5
 script:
-    - flake8 guillotina_s3storage --config=setup.cfg
-    - pytest -s --cov=guillotina_s3storage -s --tb=native -v --cov-report term-missing --cov-append ./guillotina_s3storage
+  - flake8 guillotina_s3storage --config=setup.cfg
+  - pytest -s --cov=guillotina_s3storage -s --tb=native -v --cov-report term-missing --cov-append ./guillotina_s3storage
 after_success:
   - sudo mv /etc/boto.cfg.bak /etc/boto.cfg
   - codecov
