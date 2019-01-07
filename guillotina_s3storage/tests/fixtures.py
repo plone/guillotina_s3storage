@@ -19,7 +19,7 @@ def settings_configurator(settings):
             "aws_client_id": os.environ.get('S3CLOUD_ID', 'x' * 10),
             "aws_client_secret": os.environ.get('S3CLOUD_SECRET', 'x' * 10)  # noqa
         }
-    })
+    }
 
     if 'S3CLOUD_ID' not in os.environ:
         settings['load_utilities']['s3']['settings'].update({

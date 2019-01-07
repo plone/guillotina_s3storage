@@ -19,7 +19,10 @@ install:
   - pip install -e .[test]
   - pip install flake8 codecov pytest-cov
 before_script:
-  - docker run --rm -d -p 19000:9000 --name minio minio/minio server /data
+  - docker run --rm -d -p 19000:9000 --name minio \
+      -e MINIO_ACCESS_KEY=xxxxxxxxxx \
+      -e MINIO_SECRET_KEY=xxxxxxxxxx \
+      minio/minio server /data
   - sleep 5
 script:
   - flake8 guillotina_s3storage --config=setup.cfg
