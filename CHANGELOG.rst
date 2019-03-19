@@ -1,4 +1,4 @@
-1.1.7 (unreleased)
+1.1.7 (2019-03-19)
 ------------------
 
 - Fix backoff configuration
