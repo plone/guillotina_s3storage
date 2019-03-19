@@ -33,11 +33,11 @@ MIN_UPLOAD_SIZE = 5 * 1024 * 1024
 CHUNK_SIZE = MIN_UPLOAD_SIZE
 MAX_RETRIES = 5
 
-RETRIABLE_EXCEPTIONS = [
+RETRIABLE_EXCEPTIONS = (
     botocore.exceptions.ClientError,
     aiohttp.client_exceptions.ClientPayloadError,
     botocore.exceptions.BotoCoreError
-]
+)
 
 
 class IS3FileStorageManager(IFileStorageManager):
