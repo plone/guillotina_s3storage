@@ -1,4 +1,4 @@
-2.0.3 (unreleased)
+2.0.3 (2019-03-19)
 ------------------
 
 - Fix backoff configuration
