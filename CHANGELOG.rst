@@ -1,7 +1,8 @@
 2.0.3 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix backoff configuration
+  [vangheem]
 
 
 2.0.2 (2019-01-15)
