@@ -313,6 +313,8 @@ class S3BlobStore:
         request = get_current_request()
         bucket_name = request._container_id.lower() + '.' + self._bucket_name
 
+        bucket_name = bucket_name.replace('_', '-')
+
         if bucket_name in self._cached_buckets:
             return bucket_name
 
