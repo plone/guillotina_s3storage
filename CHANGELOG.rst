@@ -1,7 +1,8 @@
 2.0.4 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- S3 does not support bucket names with underscore [bloodbare]
+  https://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html
 
 
 2.0.3 (2019-03-19)
