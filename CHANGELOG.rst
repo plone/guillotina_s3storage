@@ -1,4 +1,4 @@
-2.0.4 (unreleased)
+2.0.4 (2019-05-31)
 ------------------
 
 - S3 does not support bucket names with underscore [bloodbare]
