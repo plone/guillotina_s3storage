@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
-from guillotina import configure
+from guillotina import configure, task_vars
 from guillotina.component import get_utility
 from guillotina.exceptions import FileNotFoundException
 from guillotina.files import BaseCloudFile
 from guillotina.files.utils import generate_key
 from guillotina.interfaces import IFileCleanup
-from guillotina.interfaces import IFileStorageManager
+from guillotina.interfaces import IExternalFileStorageManager
 from guillotina.interfaces import IRequest
 from guillotina.interfaces import IResource
 from guillotina.response import HTTPNotFound
 from guillotina.schema import Object
-from guillotina.utils import get_current_request
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.interfaces import IS3File
 from guillotina_s3storage.interfaces import IS3FileField
@@ -39,7 +38,7 @@ RETRIABLE_EXCEPTIONS = (
 )
 
 
-class IS3FileStorageManager(IFileStorageManager):
+class IS3FileStorageManager(IExternalFileStorageManager):
     pass
 
 
@@ -148,7 +147,7 @@ class S3FileStorageManager:
                 await self._abort_multipart(dm)
 
         bucket_name = await util.get_bucket_name()
-        upload_id = generate_key(self.request, self.context)
+        upload_id = generate_key(self.context)
         await dm.update(
             _bucket_name=bucket_name,
             _upload_file_id=upload_id,
@@ -260,7 +259,7 @@ class S3FileStorageManager:
 
         util = get_utility(IS3BlobStore)
 
-        new_uri = generate_key(self.request, self.context)
+        new_uri = generate_key(self.context)
         await util._s3aioclient.copy_object(
             CopySource={
                 'Bucket': file._bucket_name,
@@ -310,8 +309,8 @@ class S3BlobStore:
         self._bucket_name = settings['bucket']
 
     async def get_bucket_name(self):
-        request = get_current_request()
-        bucket_name = request._container_id.lower() + '.' + self._bucket_name
+        container = task_vars.container.get()
+        bucket_name = container.id.lower() + '.' + self._bucket_name
 
         bucket_name = bucket_name.replace('_', '-')
 
@@ -340,12 +339,12 @@ class S3BlobStore:
         await self._s3aioclient.close()
 
     async def iterate_bucket(self):
-        req = get_current_request()
+        container = task_vars.container.get()
         bucket_name = await self.get_bucket_name()
         result = await self._s3aioclient.list_objects(
-            Bucket=bucket_name, Prefix=req._container_id + '/')
+            Bucket=bucket_name, Prefix=container.id + '/')
         paginator = self._s3aioclient.get_paginator('list_objects')
         async for result in paginator.paginate(
-                Bucket=bucket_name, Prefix=req._container_id + '/'):
+                Bucket=bucket_name, Prefix=container.id + '/'):
             for item in result.get('Contents', []):
                 yield item
