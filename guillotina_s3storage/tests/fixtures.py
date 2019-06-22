@@ -1,3 +1,4 @@
+from guillotina import task_vars
 from guillotina import testing
 
 import aiohttp
@@ -36,6 +37,18 @@ class PatchedBaseRequest(aiohttp.web_request.Request):
     @property
     def content(self):
         return self._payload
+
+    def __enter__(self):
+        task_vars.request.set(self)
+
+    def __exit__(self, *args):
+        pass
+
+    async def __aenter__(self):
+        return self.__enter__()
+
+    async def __aexit__(self, *args):
+        return self.__exit__()
 
 
 @pytest.fixture(scope='function')

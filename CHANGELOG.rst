@@ -1,7 +1,8 @@
-2.0.5 (unreleased)
+5.0.0 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Guillotina 5 only support
+  [vangheem]
 
 
 2.0.4 (2019-05-31)
