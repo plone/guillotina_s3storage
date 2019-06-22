@@ -51,7 +51,6 @@ class PatchedBaseRequest(aiohttp.web_request.Request):
         return self.__exit__()
 
 
-
 @pytest.fixture(scope='function')
 def own_dummy_request(dummy_request, minio):
     dummy_request.__class__ = PatchedBaseRequest
