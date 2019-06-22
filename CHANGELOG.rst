@@ -1,4 +1,4 @@
-5.0.0 (unreleased)
+5.0.0 (2019-06-23)
 ------------------
 
 - Guillotina 5 only support
