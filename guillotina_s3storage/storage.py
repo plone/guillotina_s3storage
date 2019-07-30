@@ -96,7 +96,7 @@ class S3FileStorageManager:
     async def iter_data(self, uri=None):
         bucket = None
         if uri is None:
-            file = self.field.get(self.field.context or self.context)
+            file = self.field.query(self.field.context or self.context, None)
             if not _is_uploaded_file(file):
                 raise FileNotFoundException('File not found')
             else:
@@ -191,7 +191,7 @@ class S3FileStorageManager:
             Body=data)
 
     async def finish(self, dm):
-        file = self.field.get(self.field.context or self.context)
+        file = self.field.query(self.field.context or self.context, None)
         if _is_uploaded_file(file):
             # delete existing file
             if self.should_clean(file):
@@ -235,7 +235,7 @@ class S3FileStorageManager:
 
     async def exists(self):
         bucket = None
-        file = self.field.get(self.field.context or self.context)
+        file = self.field.query(self.field.context or self.context, None)
         if not _is_uploaded_file(file):
             return False
         else:
@@ -251,7 +251,7 @@ class S3FileStorageManager:
             raise
 
     async def copy(self, to_storage_manager, to_dm):
-        file = self.field.get(self.field.context or self.context)
+        file = self.field.query(self.field.context or self.context, None)
         if not _is_uploaded_file(file):
             raise HTTPNotFound(content={
                 "reason": 'To copy a uri must be set on the object'
