@@ -1,7 +1,8 @@
 5.0.1 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Support no attribute defined
+  [bloodbare]
 
 
 5.0.0 (2019-06-23)
