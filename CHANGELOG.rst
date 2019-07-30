@@ -1,4 +1,4 @@
-5.0.1 (unreleased)
+5.0.1 (2019-07-30)
 ------------------
 
 - Support no attribute defined
