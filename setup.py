@@ -23,6 +23,7 @@ setup(
     zip_safe=True,
     include_package_data=True,
     packages=find_packages(exclude=['ez_setup']),
+    package_data={"": ["*.txt", "*.rst"], "guillotina_s3storage": ["py.typed"]},
     install_requires=[
         'setuptools',
         'guillotina>=5.0.0a7',
