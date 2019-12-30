@@ -26,7 +26,7 @@ setup(
     package_data={"": ["*.txt", "*.rst"], "guillotina_s3storage": ["py.typed"]},
     install_requires=[
         'setuptools',
-        'guillotina>=5.0.0a7<6',
+        'guillotina>=5.0.0,<6',
         'aiohttp>3.0.0,<4.0.0',
         'ujson',
         'aiobotocore==0.9.4',
