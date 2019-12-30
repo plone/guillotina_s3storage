@@ -763,10 +763,12 @@ async def test_read_range(own_dummy_request, mock_txn):
         mng = FileManager(ob, own_dummy_request, IContent["file"].bind(ob))
         await mng.upload()
 
-        async for chunk in mng.read_range(0, 100):
+        s3mng = S3FileStorageManager(ob, own_dummy_request, IContent["file"].bind(ob))
+
+        async for chunk in s3mng.read_range(0, 100):
             assert len(chunk) == 100
             assert chunk == _test_gif[:100]
 
-        async for chunk in mng.read_range(100, 200):
+        async for chunk in s3mng.read_range(100, 200):
             assert len(chunk) == 100
             assert chunk == _test_gif[100:200]

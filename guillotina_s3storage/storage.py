@@ -118,9 +118,7 @@ class S3FileStorageManager:
         """
         Iterate through ranges of data
         """
-        async for chunk in self.iter_data(
-            headers={"Range": f"bytes={start}-{end - 1}"}
-        ):
+        async for chunk in self.iter_data(Range=f"bytes={start}-{end - 1}"):
             yield chunk
 
     async def delete_upload(self, uri, bucket=None):
