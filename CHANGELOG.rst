@@ -1,8 +1,10 @@
 5.0.3 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Add support for reading ranges
+  [vangheem]
 
+- add black formatting
 
 5.0.2 (2019-11-01)
 ------------------
