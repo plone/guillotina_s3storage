@@ -14,7 +14,7 @@ cache:
   directories:
     - eggs
 install:
-  - sudo mv /etc/boto.cfg /etc/boto.cfg.bak
+  - sudo mv /etc/boto.cfg /etc/boto.cfg.bak || true
   - pip install -e .[test]
   - pip install flake8 codecov pytest-cov
 before_script:
