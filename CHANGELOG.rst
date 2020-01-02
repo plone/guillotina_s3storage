@@ -1,7 +1,7 @@
 5.0.4 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix release
 
 
 5.0.3 (2020-01-02)
