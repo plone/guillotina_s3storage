@@ -1,4 +1,4 @@
-5.0.3 (unreleased)
+5.0.3 (2020-01-02)
 ------------------
 
 - Add support for reading ranges
