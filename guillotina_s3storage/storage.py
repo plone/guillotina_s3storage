@@ -114,6 +114,9 @@ class S3FileStorageManager:
                 yield data
                 data = await stream.read(CHUNK_SIZE)
 
+    async def range_supported(self) -> bool:
+        return True
+
     async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
         """
         Iterate through ranges of data

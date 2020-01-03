@@ -1,7 +1,7 @@
 5.0.6 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Add missing `range_supported`
 
 
 5.0.5 (2020-01-02)
