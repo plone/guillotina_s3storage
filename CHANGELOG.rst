@@ -1,4 +1,4 @@
-5.0.7 (unreleased)
+5.0.7 (2020-05-21)
 ------------------
 
 - Open up version req
