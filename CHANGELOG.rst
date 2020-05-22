@@ -1,7 +1,7 @@
 5.0.7 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Open up version req
 
 
 5.0.6 (2020-01-02)
