@@ -26,7 +26,7 @@ setup(
     package_data={"": ["*.txt", "*.rst"], "guillotina_s3storage": ["py.typed"]},
     install_requires=[
         'setuptools',
-        'guillotina>=5.0.0,<7',
+        'guillotina>=5.0.0,<6',
         'aiohttp>3.0.0,<4.0.0',
         'ujson',
         'aiobotocore==0.9.4',
@@ -37,7 +37,8 @@ setup(
         'test': [
             'pytest',
             'pytest-aiohttp',
-            'pytest-docker-fixtures'
+            'pytest-docker-fixtures',
+            'asynctest==0.13.0'
         ]
     }
 )

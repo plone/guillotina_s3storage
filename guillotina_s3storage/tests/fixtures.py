@@ -6,6 +6,18 @@ import os
 import pytest
 
 
+S3BLOB_STORE_SETTINGS = {
+    "bucket": os.environ.get("S3CLOUD_BUCKET", "testbucket"),
+    "aws_client_id": os.environ.get("S3CLOUD_ID", "x" * 10),
+    "aws_client_secret": os.environ.get("S3CLOUD_SECRET", "x" * 10),  # noqa
+}
+
+
+@pytest.fixture
+def s3blob_store_settings():
+    return S3BLOB_STORE_SETTINGS
+
+
 def settings_configurator(settings):
     if "applications" in settings:
         settings["applications"].append("guillotina_s3storage")
@@ -15,11 +27,7 @@ def settings_configurator(settings):
     settings["load_utilities"]["s3"] = {
         "provides": "guillotina_s3storage.interfaces.IS3BlobStore",
         "factory": "guillotina_s3storage.storage.S3BlobStore",
-        "settings": {
-            "bucket": os.environ.get("S3CLOUD_BUCKET", "testbucket"),
-            "aws_client_id": os.environ.get("S3CLOUD_ID", "x" * 10),
-            "aws_client_secret": os.environ.get("S3CLOUD_SECRET", "x" * 10),  # noqa
-        },
+        "settings": S3BLOB_STORE_SETTINGS
     }
 
     if "S3CLOUD_ID" not in os.environ:

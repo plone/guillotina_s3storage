@@ -27,7 +27,7 @@ import logging
 log = logging.getLogger("guillotina_s3storage")
 
 MAX_SIZE = 1073741824
-
+DEFAULT_MAX_POOL_CONNECTIONS = 30
 MIN_UPLOAD_SIZE = 5 * 1024 * 1024
 CHUNK_SIZE = MIN_UPLOAD_SIZE
 MAX_RETRIES = 5
@@ -285,6 +285,12 @@ class S3BlobStore:
         self._aws_access_key = settings["aws_client_id"]
         self._aws_secret_key = settings["aws_client_secret"]
 
+        max_pool_connections = settings.get("max_pool_connections")
+        if max_pool_connections is not None:
+            max_pool_connections = int(max_pool_connections)
+        else:
+            max_pool_connections = DEFAULT_MAX_POOL_CONNECTIONS
+
         opts = dict(
             aws_secret_access_key=self._aws_secret_key,
             aws_access_key_id=self._aws_access_key,
@@ -293,7 +299,7 @@ class S3BlobStore:
             use_ssl=settings.get("ssl", True),
             region_name=settings.get("region_name"),
             config=aiobotocore.config.AioConfig(
-                None, max_pool_connections=settings.get("max_pool_connections", 30)
+                None, max_pool_connections=max_pool_connections
             ),
         )
 
