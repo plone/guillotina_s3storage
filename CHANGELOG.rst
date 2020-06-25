@@ -1,7 +1,7 @@
 5.0.8 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Cast max_pool_connections from string to integer.
 
 
 5.0.7 (2020-05-21)
