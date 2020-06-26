@@ -44,3 +44,10 @@ Using pip (requires Python > 3.7)
     python3.7 -m venv .
     ./bin/pip install -e .[test]
     pre-commit install
+
+Run the tests:
+
+.. code-block:: shell
+
+    docker run --rm -d -p 19000:9000 --name minio -e MINIO_ACCESS_KEY=xxxxxxxxxx -e MINIO_SECRET_KEY=xxxxxxxxxx minio/minio:RELEASE.2019-09-11T19-53-16Z server /data
+    ./bin/pytest -vx guillotina_s3storage/tests

@@ -9,6 +9,8 @@ from guillotina.tests.utils import login
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.storage import CHUNK_SIZE
 from guillotina_s3storage.storage import RETRIABLE_EXCEPTIONS
+from guillotina_s3storage.storage import DEFAULT_MAX_POOL_CONNECTIONS
+from guillotina_s3storage.storage import S3BlobStore
 from guillotina_s3storage.storage import S3FileField
 from guillotina_s3storage.storage import S3FileStorageManager
 from guillotina_s3storage.tests.mocks import AsyncMock
@@ -22,6 +24,8 @@ import backoff
 import base64
 import botocore.exceptions
 import pytest
+from asynctest import CoroutineMock
+from unittest.mock import Mock, patch
 
 
 _test_gif = base64.b64decode(
@@ -772,3 +776,26 @@ async def test_read_range(own_dummy_request, mock_txn):
         async for chunk in s3mng.read_range(100, 200):
             assert len(chunk) == 100
             assert chunk == _test_gif[100:200]
+
+
+async def test_default_max_pool_connections(s3blob_store_settings):
+    session = Mock()
+    session.create_client = CoroutineMock()
+    aio_config = Mock()
+    with patch("guillotina_s3storage.storage.aiobotocore.get_session", Mock(return_value=session)), \
+            patch("guillotina_s3storage.storage.aiobotocore.config.AioConfig", aio_config):
+        _ = S3BlobStore(s3blob_store_settings)
+        aio_config.assert_called_with(None, max_pool_connections=DEFAULT_MAX_POOL_CONNECTIONS)
+
+
+@pytest.mark.parametrize("max_pool_connections", [60, "60"])
+async def test_max_pool_connections(s3blob_store_settings, max_pool_connections):
+    s3blob_store_settings['max_pool_connections'] = max_pool_connections
+
+    session = Mock()
+    session.create_client = CoroutineMock()
+    aio_config = Mock()
+    with patch("guillotina_s3storage.storage.aiobotocore.get_session", Mock(return_value=session)), \
+            patch("guillotina_s3storage.storage.aiobotocore.config.AioConfig", aio_config):
+        _ = S3BlobStore(s3blob_store_settings)
+        aio_config.assert_called_with(None, max_pool_connections=int(max_pool_connections))

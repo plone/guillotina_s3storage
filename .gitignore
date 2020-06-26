@@ -7,3 +7,5 @@ include
 extras
 pip-selfcheck.json
 .idea
+venv
+.python-version
