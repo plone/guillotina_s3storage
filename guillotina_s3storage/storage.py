@@ -279,6 +279,10 @@ class S3FileStorageManager:
             }
         )
 
+    async def delete(self):
+        file = self.field.get(self.field.context or self.context)
+        await self.delete_upload(file.uri)
+
 
 class S3BlobStore:
     def __init__(self, settings, loop=None):
