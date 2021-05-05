@@ -1,0 +1,31 @@
+name: guillotina_s3storage
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.7, 3.8]
+
+    steps:
+      # Checkout the repository first
+      - uses: actions/checkout@v2
+
+      # Setup the python version
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Linters and typing
+      - name: Pre-checks
+        run: |
+          make pre-checks
+      # Run tests
+      - name: Run tests
+        run: |
+          # Commented out until we find a mocked GCS
+          # make tests
