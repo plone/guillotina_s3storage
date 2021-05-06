@@ -27,5 +27,5 @@ jobs:
       # Run tests
       - name: Run tests
         run: |
-          # Commented out until we find a mocked GCS
+          # Commented out until we find a mocked S3
           # make tests
