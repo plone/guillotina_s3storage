@@ -1,27 +1,28 @@
+import asyncio
+import base64
+from hashlib import md5
+
+import backoff
+import pytest
+from guillotina import task_vars
 from guillotina.component import get_utility
+from guillotina.content import Container
 from guillotina.exceptions import UnRetryableRequestError
-from guillotina.files import FileManager
 from guillotina.files import MAX_REQUEST_CACHE_SIZE
+from guillotina.files import FileManager
 from guillotina.files.adapter import DBDataManager
 from guillotina.files.utils import generate_key
 from guillotina.tests.utils import create_content
 from guillotina.tests.utils import login
+from zope.interface import Interface
+
+import botocore.exceptions
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.storage import CHUNK_SIZE
 from guillotina_s3storage.storage import RETRIABLE_EXCEPTIONS
 from guillotina_s3storage.storage import S3FileField
 from guillotina_s3storage.storage import S3FileStorageManager
 from guillotina_s3storage.tests.mocks import AsyncMock
-from guillotina import task_vars
-from guillotina.content import Container
-from hashlib import md5
-from zope.interface import Interface
-
-import asyncio
-import backoff
-import base64
-import botocore.exceptions
-import pytest
 
 
 _test_gif = base64.b64decode(
@@ -113,7 +114,9 @@ async def test_store_file_in_cloud(own_dummy_request, mock_txn):
         assert len(await get_all_objects()) == 0
 
 
-async def test_store_file_uses_cached_request_data_on_retry(own_dummy_request, mock_txn):
+async def test_store_file_uses_cached_request_data_on_retry(
+    own_dummy_request, mock_txn
+):
     login()
     container = create_content(Container, id="test-container")
     task_vars.container.set(container)

@@ -1,7 +1,7 @@
 5.0.8 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Allow to delete a file on multiattachment behavior
 
 
 5.0.7 (2020-05-21)

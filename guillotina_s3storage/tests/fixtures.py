@@ -1,9 +1,9 @@
-from guillotina import task_vars
-from guillotina import testing
+import os
 
 import aiohttp
-import os
 import pytest
+from guillotina import task_vars
+from guillotina import testing
 
 
 def settings_configurator(settings):

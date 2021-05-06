@@ -1,27 +1,29 @@
 # -*- coding: utf-8 -*-
+import asyncio
+import logging
 from typing import AsyncIterator
-from guillotina import configure, task_vars
+
+import aiohttp
+import backoff
+from guillotina import configure
+from guillotina import task_vars
 from guillotina.component import get_utility
 from guillotina.exceptions import FileNotFoundException
 from guillotina.files import BaseCloudFile
 from guillotina.files.utils import generate_key
-from guillotina.interfaces import IFileCleanup
 from guillotina.interfaces import IExternalFileStorageManager
+from guillotina.interfaces import IFileCleanup
 from guillotina.interfaces import IRequest
 from guillotina.interfaces import IResource
 from guillotina.response import HTTPNotFound
 from guillotina.schema import Object
-from guillotina_s3storage.interfaces import IS3BlobStore
-from guillotina_s3storage.interfaces import IS3File
-from guillotina_s3storage.interfaces import IS3FileField
 from zope.interface import implementer
 
 import aiobotocore
-import aiohttp
-import asyncio
-import backoff
 import botocore
-import logging
+from guillotina_s3storage.interfaces import IS3BlobStore
+from guillotina_s3storage.interfaces import IS3File
+from guillotina_s3storage.interfaces import IS3FileField
 
 
 log = logging.getLogger("guillotina_s3storage")
@@ -278,6 +280,10 @@ class S3FileStorageManager:
                 "filename": file.filename or "unknown",
             }
         )
+
+    async def delete(self):
+        file = self.field.get(self.field.context or self.context)
+        await self.delete_upload(file.uri)
 
 
 class S3BlobStore:
