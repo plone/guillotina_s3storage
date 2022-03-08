@@ -3,6 +3,7 @@ import base64
 from hashlib import md5
 
 import backoff
+import botocore.exceptions
 import pytest
 from guillotina import task_vars
 from guillotina.component import get_utility
@@ -16,7 +17,6 @@ from guillotina.tests.utils import create_content
 from guillotina.tests.utils import login
 from zope.interface import Interface
 
-import botocore.exceptions
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.storage import CHUNK_SIZE
 from guillotina_s3storage.storage import RETRIABLE_EXCEPTIONS
@@ -775,3 +775,20 @@ async def test_read_range(own_dummy_request, mock_txn):
         async for chunk in s3mng.read_range(100, 200):
             assert len(chunk) == 100
             assert chunk == _test_gif[100:200]
+
+
+async def test_custom_bucket_name(dummy_request):
+    util = get_utility(IS3BlobStore)
+    request = dummy_request  # noqa
+    login()
+    container = create_content(Container, id="test-container")
+    task_vars.container.set(container)
+
+    # No dots in the name, delimiter is -
+    bucket_name = await util.get_bucket_name()
+    assert bucket_name.startswith("test-container-testbucket")
+
+    # Dots in the name, delimiter is .
+    util._bucket_name = "testbucket.com"
+    bucket_name = await util.get_bucket_name()
+    assert bucket_name.startswith("test-container.testbucket.com")

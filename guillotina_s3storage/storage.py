@@ -3,8 +3,10 @@ import asyncio
 import logging
 from typing import AsyncIterator
 
+import aiobotocore
 import aiohttp
 import backoff
+import botocore
 from guillotina import configure
 from guillotina import task_vars
 from guillotina.component import get_utility
@@ -19,8 +21,6 @@ from guillotina.response import HTTPNotFound
 from guillotina.schema import Object
 from zope.interface import implementer
 
-import aiobotocore
-import botocore
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.interfaces import IS3File
 from guillotina_s3storage.interfaces import IS3FileField
@@ -315,9 +315,23 @@ class S3BlobStore:
 
         self._bucket_name = settings["bucket"]
 
+        self._bucket_name_format = settings.get(
+            "bucket_name_format", "{container}{delimiter}{base}"
+        )
+
     async def get_bucket_name(self):
         container = task_vars.container.get()
-        bucket_name = container.id.lower() + "." + self._bucket_name
+
+        if "." in self._bucket_name:
+            char_delimiter = "."
+        else:
+            char_delimiter = "-"
+
+        bucket_name = self._bucket_name_format.format(
+            container=container.id.lower(),
+            delimiter=char_delimiter,
+            base=self._bucket_name,
+        )
 
         bucket_name = bucket_name.replace("_", "-")
 
