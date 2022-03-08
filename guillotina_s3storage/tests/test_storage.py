@@ -3,6 +3,7 @@ import base64
 from hashlib import md5
 
 import backoff
+import botocore.exceptions
 import pytest
 from guillotina import task_vars
 from guillotina.component import get_utility
@@ -16,7 +17,6 @@ from guillotina.tests.utils import create_content
 from guillotina.tests.utils import login
 from zope.interface import Interface
 
-import botocore.exceptions
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.storage import CHUNK_SIZE
 from guillotina_s3storage.storage import RETRIABLE_EXCEPTIONS

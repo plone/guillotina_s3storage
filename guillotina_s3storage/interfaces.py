@@ -5,18 +5,15 @@ from zope.interface import Interface
 
 
 class IS3FileField(IFileField):
-    """Field marked as S3FileField
-    """
+    """Field marked as S3FileField"""
 
 
 # Configuration Utility
 
 
 class IS3BlobStore(Interface):
-    """Configuration utility.
-    """
+    """Configuration utility."""
 
 
 class IS3File(IFile):
-    """Marker for a S3File
-    """
+    """Marker for a S3File"""
