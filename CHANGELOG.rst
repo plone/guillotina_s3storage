@@ -1,7 +1,7 @@
-5.0.9 (unreleased)
+5.0.9
 ------------------
 
-- Nothing changed yet.
+- Allow bucket name delimiter config
 
 
 5.0.8 (2021-05-06)
