@@ -315,9 +315,23 @@ class S3BlobStore:
 
         self._bucket_name = settings["bucket"]
 
+        self._bucket_name_format = settings.get(
+            "bucket_name_format", "{container}{delimiter}{base}"
+        )
+
     async def get_bucket_name(self):
         container = task_vars.container.get()
-        bucket_name = container.id.lower() + "." + self._bucket_name
+
+        if "." in self._bucket_name:
+            char_delimiter = "."
+        else:
+            char_delimiter = "-"
+
+        bucket_name = self._bucket_name_format.format(
+            container=container.id.lower(),
+            delimiter=char_delimiter,
+            base=self._bucket_name,
+        )
 
         bucket_name = bucket_name.replace("_", "-")
 

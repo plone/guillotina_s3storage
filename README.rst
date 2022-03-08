@@ -25,6 +25,7 @@ Example config.json:
                 "aws_client_id": "<client id>",
                 "aws_client_secret": "<client secret>",
                 "bucket": "<bucket name suffix>",
+                "bucket_name_format": "{container}{delimiter}{base}",
                 "endpoint_url": null,
                 "ssl": true,
                 "verify_ssl": null,
