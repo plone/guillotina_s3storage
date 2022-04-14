@@ -150,8 +150,8 @@ class S3FileStorageManager:
             bucket_name = dm.get("_bucket_name")
             async with util.s3_client() as client:
                 await client.abort_multipart_upload(
-                Bucket=bucket_name, Key=upload_file_id, UploadId=mpu["UploadId"]
-            )
+                    Bucket=bucket_name, Key=upload_file_id, UploadId=mpu["UploadId"]
+                )
         except Exception:
             log.warn("Could not abort multipart upload", exc_info=True)
 
@@ -177,8 +177,8 @@ class S3FileStorageManager:
         util = get_utility(IS3BlobStore)
         async with util.s3_client() as client:
             return await client.create_multipart_upload(
-            Bucket=bucket_name, Key=upload_id
-        )
+                Bucket=bucket_name, Key=upload_id
+            )
 
     async def append(self, dm, iterable, offset) -> int:
         size = 0
@@ -197,12 +197,12 @@ class S3FileStorageManager:
         util = get_utility(IS3BlobStore)
         async with util.s3_client() as client:
             return await client.upload_part(
-            Bucket=dm.get("_bucket_name"),
-            Key=dm.get("_upload_file_id"),
-            PartNumber=dm.get("_block"),
-            UploadId=dm.get("_mpu")["UploadId"],
-            Body=data,
-        )
+                Bucket=dm.get("_bucket_name"),
+                Key=dm.get("_upload_file_id"),
+                PartNumber=dm.get("_block"),
+                UploadId=dm.get("_mpu")["UploadId"],
+                Body=data,
+            )
 
     async def finish(self, dm):
         file = self.field.query(self.field.context or self.context, None)
@@ -241,11 +241,11 @@ class S3FileStorageManager:
             await dm.update(_multipart=multipart, _block=dm.get("_block") + 1)
         async with util.s3_client() as client:
             await client.complete_multipart_upload(
-            Bucket=dm.get("_bucket_name"),
-            Key=dm.get("_upload_file_id"),
-            UploadId=dm.get("_mpu")["UploadId"],
-            MultipartUpload=dm.get("_multipart"),
-        )
+                Bucket=dm.get("_bucket_name"),
+                Key=dm.get("_upload_file_id"),
+                UploadId=dm.get("_mpu")["UploadId"],
+                MultipartUpload=dm.get("_multipart"),
+            )
 
     async def exists(self):
         bucket = None
@@ -258,9 +258,7 @@ class S3FileStorageManager:
         util = get_utility(IS3BlobStore)
         try:
             async with util.s3_client() as client:
-                return (
-                await client.get_object(Bucket=bucket, Key=uri) is not None
-            )
+                return await client.get_object(Bucket=bucket, Key=uri) is not None
         except botocore.exceptions.ClientError as ex:
             if ex.response["Error"]["Code"] == "NoSuchKey":
                 return False
@@ -278,10 +276,10 @@ class S3FileStorageManager:
         new_uri = generate_key(self.context)
         async with util.s3_client() as client:
             await client.copy_object(
-            CopySource={"Bucket": file._bucket_name, "Key": file.uri},
-            Bucket=file._bucket_name,
-            Key=new_uri,
-        )
+                CopySource={"Bucket": file._bucket_name, "Key": file.uri},
+                Bucket=file._bucket_name,
+                Key=new_uri,
+            )
         await to_dm.finish(
             values={
                 "content_type": file.content_type,
@@ -387,8 +385,8 @@ class S3BlobStore:
         bucket_name = await self.get_bucket_name()
         async with self.s3_client() as client:
             result = await client.list_objects(
-            Bucket=bucket_name, Prefix=container.id + "/"
-        )
+                Bucket=bucket_name, Prefix=container.id + "/"
+            )
         async with self.s3_client() as client:
             paginator = client.get_paginator("list_objects")
             async for result in paginator.paginate(
