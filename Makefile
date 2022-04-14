@@ -14,7 +14,7 @@ pre-checks: pre-checks-deps
 	mypy -p guillotina_s3storage --ignore-missing-imports
 
 lint-deps:
-	pip install "isort>=4,<5" black
+	pip install "isort>=5" black
 
 lint:
 	isort -rc guillotina_s3storage

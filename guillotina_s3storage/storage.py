@@ -1,4 +1,13 @@
 # -*- coding: utf-8 -*-
+import asyncio
+import contextlib
+import logging
+from typing import AsyncIterator
+
+import aiobotocore
+import aiohttp
+import backoff
+import botocore
 from guillotina import configure
 from guillotina import task_vars
 from guillotina.component import get_utility
@@ -11,19 +20,11 @@ from guillotina.interfaces import IRequest
 from guillotina.interfaces import IResource
 from guillotina.response import HTTPNotFound
 from guillotina.schema import Object
+from zope.interface import implementer
+
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.interfaces import IS3File
 from guillotina_s3storage.interfaces import IS3FileField
-from typing import AsyncIterator
-from zope.interface import implementer
-
-import aiobotocore
-import aiohttp
-import asyncio
-import backoff
-import botocore
-import contextlib
-import logging
 
 
 log = logging.getLogger("guillotina_s3storage")
