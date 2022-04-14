@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import random
 from hashlib import md5
 
 import backoff
@@ -19,6 +20,7 @@ from zope.interface import Interface
 
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.storage import CHUNK_SIZE
+from guillotina_s3storage.storage import DEFAULT_MAX_POOL_CONNECTIONS
 from guillotina_s3storage.storage import RETRIABLE_EXCEPTIONS
 from guillotina_s3storage.storage import S3FileField
 from guillotina_s3storage.storage import S3FileStorageManager
@@ -65,21 +67,35 @@ def reader():
 
 
 @pytest.fixture()
-def upload_request(dummy_request, reader):
+def setup_container(dummy_request):
+    login()
+    container = create_content(Container, id="test-container")
+    task_vars.container.set(container)
+    yield container
+
+
+@pytest.fixture()
+async def util(setup_container):
+    util = get_utility(IS3BlobStore)
+    # cleanup
+    async for item in util.iterate_bucket():
+        await util._s3aioclient.delete_object(
+            Bucket=await util.get_bucket_name(), Key=item["Key"]
+        )
+
+    yield util
+
+    task_vars.container.set(None)
+
+
+@pytest.fixture()
+async def upload_request(dummy_request, reader, util, mock_txn):
     dummy_request._stream_reader = dummy_request._payload = reader
     yield dummy_request
 
 
 class IContent(Interface):
     file = S3FileField()
-
-
-async def _cleanup():
-    util = get_utility(IS3BlobStore)
-    async for item in util.iterate_bucket():
-        await util._s3aioclient.delete_object(
-            Bucket=await util.get_bucket_name(), Key=item["Key"]
-        )
 
 
 async def get_all_objects():
@@ -90,19 +106,11 @@ async def get_all_objects():
     return items
 
 
-async def test_get_storage_object(upload_request):
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    util = get_utility(IS3BlobStore)
+async def test_get_storage_object(util):
     assert await util.get_bucket_name() is not None
 
 
-async def test_store_file_in_cloud(upload_request, mock_txn):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
-
+async def test_store_file_in_cloud(upload_request):
     upload_request.headers.update(
         {
             "Content-Type": "image/gif",
@@ -132,12 +140,7 @@ async def test_store_file_in_cloud(upload_request, mock_txn):
     assert len(await get_all_objects()) == 0
 
 
-async def test_store_file_uses_cached_request_data_on_retry(upload_request, mock_txn):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-
-    await _cleanup()
+async def test_store_file_uses_cached_request_data_on_retry(upload_request):
 
     upload_request.headers.update(
         {
@@ -177,12 +180,7 @@ async def test_store_file_uses_cached_request_data_on_retry(upload_request, mock
     assert len(await get_all_objects()) == 0
 
 
-async def test_store_file_in_cloud_using_tus(upload_request, mock_txn):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
-
+async def test_store_file_in_cloud_using_tus(upload_request):
     upload_request.headers.update(
         {
             "Content-Type": "image/gif",
@@ -214,12 +212,7 @@ async def test_store_file_in_cloud_using_tus(upload_request, mock_txn):
     assert len(await get_all_objects()) == 0
 
 
-async def test_multipart_upload_with_tus(upload_request, mock_txn, reader):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
-
+async def test_multipart_upload_with_tus(upload_request, reader):
     file_data = _test_gif
     while len(file_data) < (11 * 1024 * 1024):
         file_data += _test_gif
@@ -269,12 +262,7 @@ async def test_multipart_upload_with_tus(upload_request, mock_txn, reader):
     assert len(await get_all_objects()) == 0
 
 
-async def test_large_file_with_upload(upload_request, mock_txn, reader):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
-
+async def test_large_file_with_upload(upload_request, reader):
     file_data = _test_gif
     while len(file_data) < (11 * 1024 * 1024):
         file_data += _test_gif
@@ -311,14 +299,7 @@ async def test_large_file_with_upload(upload_request, mock_txn, reader):
     assert len(await get_all_objects()) == 0
 
 
-async def test_multipart_upload_with_tus_and_tid_conflict(
-    upload_request, mock_txn, reader
-):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
-
+async def test_multipart_upload_with_tus_and_tid_conflict(upload_request, reader):
     file_data = _test_gif
     while len(file_data) < (11 * 1024 * 1024):
         file_data += _test_gif
@@ -381,7 +362,7 @@ async def test_multipart_upload_with_tus_and_tid_conflict(
     assert len(await get_all_objects()) == 0
 
 
-def test_gen_key(upload_request, mock_txn):
+def test_gen_key(upload_request):
     container = create_content(Container, id="test-container")
     task_vars.container.set(container)
     ob = create_content()
@@ -392,12 +373,7 @@ def test_gen_key(upload_request, mock_txn):
     assert last.split("::")[0] == ob.__uuid__
 
 
-async def test_copy(upload_request, mock_txn):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
-
+async def test_copy(upload_request):
     upload_request.headers.update(
         {
             "Content-Type": "image/gif",
@@ -436,11 +412,7 @@ async def test_copy(upload_request, mock_txn):
     assert len(items) == 2
 
 
-async def test_iterate_storage(upload_request, mock_txn, reader):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
+async def test_iterate_storage(util, upload_request, reader):
 
     upload_request.headers.update(
         {
@@ -461,20 +433,13 @@ async def test_iterate_storage(upload_request, mock_txn, reader):
         mng = FileManager(ob, upload_request, IContent["file"].bind(ob))
         await mng.upload()
 
-    util = get_utility(IS3BlobStore)
     items = []
     async for item in util.iterate_bucket():
         items.append(item)
     assert len(items) == 20
 
-    await _cleanup()
 
-
-async def test_download(upload_request, mock_txn, reader):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
+async def test_download(upload_request, reader):
 
     file_data = b""
     # we want to test multiple chunks here...
@@ -502,11 +467,7 @@ async def test_download(upload_request, mock_txn, reader):
     assert int(resp.content_length) == len(file_data)
 
 
-async def test_raises_not_retryable(upload_request, mock_txn, reader):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
+async def test_raises_not_retryable(upload_request, reader):
 
     file_data = b""
     # we want to test multiple chunks here...
@@ -534,12 +495,7 @@ async def test_raises_not_retryable(upload_request, mock_txn, reader):
         await mng.upload()
 
 
-async def test_save_file(upload_request, mock_txn):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-
-    await _cleanup()
+async def test_save_file(upload_request):
 
     ob = create_content()
     ob.file = None
@@ -554,11 +510,7 @@ async def test_save_file(upload_request, mock_txn):
     assert len(items) == 1
 
 
-async def test_save_file_multipart(upload_request, mock_txn):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
+async def test_save_file_multipart(upload_request):
 
     ob = create_content()
     ob.file = None
@@ -574,10 +526,7 @@ async def test_save_file_multipart(upload_request, mock_txn):
     assert len(items) == 1
 
 
-async def test_save_same_chunk_multiple_times(upload_request, mock_txn):
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    util = get_utility(IS3BlobStore)
+async def test_save_same_chunk_multiple_times(util, upload_request):
     upload_file_id = "foobar124"
     bucket_name = await util.get_bucket_name()
     multipart = {"Parts": []}
@@ -654,11 +603,7 @@ async def test_save_same_chunk_multiple_times(upload_request, mock_txn):
     assert data[1024 * 1024 * 10 : 1024 * 1024 * 15] == b"E" * 1024 * 1024 * 5
 
 
-async def test_upload_empty_file(upload_request, mock_txn):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
+async def test_upload_empty_file(upload_request):
 
     ob = create_content()
     ob.file = None
@@ -674,11 +619,7 @@ async def test_upload_empty_file(upload_request, mock_txn):
     assert len(items) == 1
 
 
-async def test_file_exists(upload_request, mock_txn):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
+async def test_file_exists(upload_request):
 
     upload_request.headers.update(
         {
@@ -731,18 +672,12 @@ async def _test_exc_backoff(util):
     )
 
 
-async def test_catch_client_error(upload_request):
-    util = get_utility(IS3BlobStore)
+async def test_catch_client_error(util, upload_request):
     with pytest.raises(botocore.exceptions.ClientError):
         await _test_exc_backoff(util)
 
 
-async def test_read_range(upload_request, mock_txn):
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-    await _cleanup()
-
+async def test_read_range(upload_request):
     upload_request.headers.update(
         {
             "Content-Type": "image/gif",
@@ -769,13 +704,7 @@ async def test_read_range(upload_request, mock_txn):
         assert chunk == _test_gif[100:200]
 
 
-async def test_custom_bucket_name(dummy_request):
-    util = get_utility(IS3BlobStore)
-    request = dummy_request  # noqa
-    login()
-    container = create_content(Container, id="test-container")
-    task_vars.container.set(container)
-
+async def test_custom_bucket_name(util):
     # No dots in the name, delimiter is -
     bucket_name = await util.get_bucket_name()
     assert bucket_name.startswith("test-container-testbucket")
@@ -784,3 +713,63 @@ async def test_custom_bucket_name(dummy_request):
     util._bucket_name = "testbucket.com"
     bucket_name = await util.get_bucket_name()
     assert bucket_name.startswith("test-container.testbucket.com")
+
+
+async def _download_uri(client, bucket, uri):
+    downloader = await client.get_object(Bucket=bucket, Key=uri)
+
+    # we do not want to timeout ever from this...
+    # downloader['Body'].set_socket_timeout(999999)
+    async with downloader["Body"] as stream:
+        data = await stream.read(CHUNK_SIZE)
+        while True:
+            if not data:
+                break
+            data = await stream.read(CHUNK_SIZE)
+
+
+async def _upload_uri(client, bucket, uri):
+    print(f"Start uploading {uri}")
+    mpu = await client.create_multipart_upload(Bucket=bucket, Key=uri)
+    multipart = {"Parts": []}
+    part = None
+    for block in range(2):
+        part = await client.upload_part(
+            Bucket=bucket,
+            Key=uri,
+            PartNumber=block + 1,
+            UploadId=mpu["UploadId"],
+            Body="X" * CHUNK_SIZE,
+        )
+        multipart["Parts"].append({"PartNumber": block + 1, "ETag": part["ETag"]})
+
+    await client.complete_multipart_upload(
+        Bucket=bucket,
+        Key=uri,
+        UploadId=mpu["UploadId"],
+        MultipartUpload=multipart,
+    )
+    print(f"Stop uploading {uri}")
+
+
+async def test_connection_leak(util):
+    bucket_name = await util.get_bucket_name()
+    client = util._s3aioclient
+    uri = "testuri"
+
+    # await client.put_object(Bucket=bucket_name, Key=uri)
+
+    tasks = []
+    test_uri_prefix = f"{random.randint(0, 999999)}-"
+    for idx in range(DEFAULT_MAX_POOL_CONNECTIONS * 2):
+        tasks.append(
+            asyncio.create_task(
+                _upload_uri(client, bucket_name, test_uri_prefix + str(idx))
+            )
+        )
+
+    done, pending = await asyncio.wait(tasks)
+    assert len(pending) == 0
+
+    for task in done:
+        assert task.exception() is None, task.exception()

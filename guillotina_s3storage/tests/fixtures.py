@@ -1,9 +1,5 @@
 import os
-from unittest.mock import patch
 
-import aiohttp
-import pytest
-from guillotina import task_vars
 from guillotina import testing
 
 
@@ -31,21 +27,3 @@ def settings_configurator(settings):
 
 
 testing.configure_with(settings_configurator)
-
-
-class PatchedBaseRequest(aiohttp.web_request.Request):
-    @property
-    def content(self):
-        return self._payload
-
-    def __enter__(self):
-        task_vars.request.set(self)
-
-    def __exit__(self, *args):
-        pass
-
-    async def __aenter__(self):
-        return self.__enter__()
-
-    async def __aexit__(self, *args):
-        return self.__exit__()
