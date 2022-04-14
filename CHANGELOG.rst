@@ -1,7 +1,8 @@
 5.0.10 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Use a semaphore to control usage of aiobotocore client
+  See: https://github.com/aio-libs/aiobotocore/issues/738#issuecomment-639026068
 
 
 5.0.9 (2022-03-08)
