@@ -1,4 +1,5 @@
 import os
+from unittest.mock import patch
 
 import aiohttp
 import pytest
@@ -25,11 +26,7 @@ def settings_configurator(settings):
 
     if "S3CLOUD_ID" not in os.environ:
         settings["load_utilities"]["s3"]["settings"].update(
-            {
-                "endpoint_url": "http://localhost:19000",
-                "verify_ssl": False,
-                "ssl": False,
-            }
+            {"endpoint_url": "http://localhost:4566", "verify_ssl": False, "ssl": False}
         )
 
 
@@ -52,9 +49,3 @@ class PatchedBaseRequest(aiohttp.web_request.Request):
 
     async def __aexit__(self, *args):
         return self.__exit__()
-
-
-@pytest.fixture(scope="function")
-def own_dummy_request(dummy_request, minio):
-    dummy_request.__class__ = PatchedBaseRequest
-    yield dummy_request
