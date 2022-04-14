@@ -715,19 +715,6 @@ async def test_custom_bucket_name(util):
     assert bucket_name.startswith("test-container.testbucket.com")
 
 
-async def _download_uri(client, bucket, uri):
-    downloader = await client.get_object(Bucket=bucket, Key=uri)
-
-    # we do not want to timeout ever from this...
-    # downloader['Body'].set_socket_timeout(999999)
-    async with downloader["Body"] as stream:
-        data = await stream.read(CHUNK_SIZE)
-        while True:
-            if not data:
-                break
-            data = await stream.read(CHUNK_SIZE)
-
-
 async def _upload_uri(client, bucket, uri):
     print(f"Start uploading {uri}")
     mpu = await client.create_multipart_upload(Bucket=bucket, Key=uri)
@@ -755,9 +742,6 @@ async def _upload_uri(client, bucket, uri):
 async def test_connection_leak(util):
     bucket_name = await util.get_bucket_name()
     client = util._s3aioclient
-    uri = "testuri"
-
-    # await client.put_object(Bucket=bucket_name, Key=uri)
 
     tasks = []
     test_uri_prefix = f"{random.randint(0, 999999)}-"
