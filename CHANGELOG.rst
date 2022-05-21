@@ -1,4 +1,4 @@
-5.0.10 (unreleased)
+5.0.10 (2022-05-21)
 -------------------
 
 - Use a semaphore to control usage of aiobotocore client
