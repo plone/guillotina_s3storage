@@ -1,5 +1,6 @@
 s3:
-	docker run --name s3server -p 8000:8000 scality/s3server
+	docker run -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+	docker run -e "SERVICES=s3" -p 4566:4566 localstack/localstack
 
 install:
 	pip install -e .[test]
@@ -14,7 +15,7 @@ pre-checks: pre-checks-deps
 	mypy -p guillotina_s3storage --ignore-missing-imports
 
 lint-deps:
-	pip install "isort>=4,<5" black
+	pip install "isort>=5" black
 
 lint:
 	isort -rc guillotina_s3storage

@@ -10,6 +10,16 @@ jobs:
       matrix:
         python-version: [3.7, 3.8]
 
+    services:
+      # Label used to access the service container
+      localstack:
+        # Docker Hub image
+        image: localstack/localstack
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: s3
+
     steps:
       # Checkout the repository first
       - uses: actions/checkout@v2
@@ -27,5 +37,4 @@ jobs:
       # Run tests
       - name: Run tests
         run: |
-          # Commented out until we find a mocked S3
-          # make tests
+          make tests
