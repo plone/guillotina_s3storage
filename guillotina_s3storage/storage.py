@@ -144,6 +144,7 @@ class S3FileStorageManager:
 
     async def _abort_multipart(self, dm):
         util = get_utility(IS3BlobStore)
+        log.info(f"Aborting multi part upload: {dm}")
         try:
             mpu = dm.get("_mpu")
             upload_file_id = dm.get("_upload_file_id")
@@ -152,6 +153,7 @@ class S3FileStorageManager:
                 await client.abort_multipart_upload(
                     Bucket=bucket_name, Key=upload_file_id, UploadId=mpu["UploadId"]
                 )
+            log.info(f"Successfully aborted multi part upload: {dm}")
         except Exception:
             log.warn("Could not abort multipart upload", exc_info=True)
 
@@ -164,6 +166,9 @@ class S3FileStorageManager:
 
         bucket_name = await util.get_bucket_name()
         upload_id = generate_key(self.context)
+
+        log.info(f"Starting multi part upload to {bucket_name}: {dm}")
+
         await dm.update(
             _bucket_name=bucket_name,
             _upload_file_id=upload_id,
@@ -172,10 +177,13 @@ class S3FileStorageManager:
             _mpu=await self._create_multipart(bucket_name, upload_id),
         )
 
+        log.info(f"Multi part upload started to {bucket_name}: {dm}")
+
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _create_multipart(self, bucket_name, upload_id):
         util = get_utility(IS3BlobStore)
         async with util.s3_client() as client:
+            log.info(f"Creating multi part upload to {bucket_name}: ID = {upload_id}")
             return await client.create_multipart_upload(
                 Bucket=bucket_name, Key=upload_id
             )
@@ -196,6 +204,9 @@ class S3FileStorageManager:
     async def _upload_part(self, dm, data):
         util = get_utility(IS3BlobStore)
         async with util.s3_client() as client:
+            bucket_name = dm.get("_bucket_name")
+            upload_id = dm.get("_upload_file_id")
+            log.info(f"Uploading part to {bucket_name}: ID = {upload_id}")
             return await client.upload_part(
                 Bucket=dm.get("_bucket_name"),
                 Key=dm.get("_upload_file_id"),
@@ -205,12 +216,16 @@ class S3FileStorageManager:
             )
 
     async def finish(self, dm):
+        bucket_name = dm.get("_bucket_name")
+        log.info(f"Finishing multi part upload to {bucket_name}: {dm}")
         file = self.field.query(self.field.context or self.context, None)
         if _is_uploaded_file(file):
             # delete existing file
             if self.should_clean(file):
                 try:
+                    log.info(f"Deleting upload to {bucket_name}: {dm}")
                     await self.delete_upload(file.uri, file._bucket_name)
+                    log.info(f"Deleted upload to {bucket_name}: {dm}")
                 except botocore.exceptions.ClientError:
                     log.error(
                         f"Referenced key {file.uri} could not be found", exc_info=True
@@ -218,6 +233,7 @@ class S3FileStorageManager:
                     log.warn("Error deleting object", exc_info=True)
 
         if dm.get("_mpu") is not None:
+            log.info(f"Attempting to complete remaining MPU for {bucket_name}: {dm}")
             await self._complete_multipart_upload(dm)
         await dm.update(
             uri=dm.get("_upload_file_id"),
@@ -226,6 +242,8 @@ class S3FileStorageManager:
             _block=None,
             _upload_file_id=None,
         )
+
+        log.info(f"Finished multi part upload to {bucket_name}: {dm}")
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _complete_multipart_upload(self, dm):
