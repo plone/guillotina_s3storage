@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import asyncio
+import contextlib
 import logging
 from typing import AsyncIterator
 
+import aiobotocore
 import aiohttp
 import backoff
+import botocore
 from guillotina import configure
 from guillotina import task_vars
 from guillotina.component import get_utility
@@ -19,8 +22,6 @@ from guillotina.response import HTTPNotFound
 from guillotina.schema import Object
 from zope.interface import implementer
 
-import aiobotocore
-import botocore
 from guillotina_s3storage.interfaces import IS3BlobStore
 from guillotina_s3storage.interfaces import IS3File
 from guillotina_s3storage.interfaces import IS3FileField
@@ -29,6 +30,7 @@ from guillotina_s3storage.interfaces import IS3FileField
 log = logging.getLogger("guillotina_s3storage")
 
 MAX_SIZE = 1073741824
+DEFAULT_MAX_POOL_CONNECTIONS = 30
 
 MIN_UPLOAD_SIZE = 5 * 1024 * 1024
 CHUNK_SIZE = MIN_UPLOAD_SIZE
@@ -92,7 +94,8 @@ class S3FileStorageManager:
         util = get_utility(IS3BlobStore)
         if bucket is None:
             bucket = await util.get_bucket_name()
-        return await util._s3aioclient.get_object(Bucket=bucket, Key=uri, **kwargs)
+        async with util.s3_client() as client:
+            return await client.get_object(Bucket=bucket, Key=uri, **kwargs)
 
     async def iter_data(self, uri=None, **kwargs):
         bucket = None
@@ -132,7 +135,8 @@ class S3FileStorageManager:
             bucket = await util.get_bucket_name()
         if uri is not None:
             try:
-                await util._s3aioclient.delete_object(Bucket=bucket, Key=uri)
+                async with util.s3_client() as client:
+                    await client.delete_object(Bucket=bucket, Key=uri)
             except botocore.exceptions.ClientError:
                 log.warn("Error deleting object", exc_info=True)
         else:
@@ -144,9 +148,10 @@ class S3FileStorageManager:
             mpu = dm.get("_mpu")
             upload_file_id = dm.get("_upload_file_id")
             bucket_name = dm.get("_bucket_name")
-            await util._s3aioclient.abort_multipart_upload(
-                Bucket=bucket_name, Key=upload_file_id, UploadId=mpu["UploadId"]
-            )
+            async with util.s3_client() as client:
+                await client.abort_multipart_upload(
+                    Bucket=bucket_name, Key=upload_file_id, UploadId=mpu["UploadId"]
+                )
         except Exception:
             log.warn("Could not abort multipart upload", exc_info=True)
 
@@ -170,9 +175,10 @@ class S3FileStorageManager:
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _create_multipart(self, bucket_name, upload_id):
         util = get_utility(IS3BlobStore)
-        return await util._s3aioclient.create_multipart_upload(
-            Bucket=bucket_name, Key=upload_id
-        )
+        async with util.s3_client() as client:
+            return await client.create_multipart_upload(
+                Bucket=bucket_name, Key=upload_id
+            )
 
     async def append(self, dm, iterable, offset) -> int:
         size = 0
@@ -189,13 +195,14 @@ class S3FileStorageManager:
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _upload_part(self, dm, data):
         util = get_utility(IS3BlobStore)
-        return await util._s3aioclient.upload_part(
-            Bucket=dm.get("_bucket_name"),
-            Key=dm.get("_upload_file_id"),
-            PartNumber=dm.get("_block"),
-            UploadId=dm.get("_mpu")["UploadId"],
-            Body=data,
-        )
+        async with util.s3_client() as client:
+            return await client.upload_part(
+                Bucket=dm.get("_bucket_name"),
+                Key=dm.get("_upload_file_id"),
+                PartNumber=dm.get("_block"),
+                UploadId=dm.get("_mpu")["UploadId"],
+                Body=data,
+            )
 
     async def finish(self, dm):
         file = self.field.query(self.field.context or self.context, None)
@@ -232,12 +239,13 @@ class S3FileStorageManager:
                 {"PartNumber": dm.get("_block"), "ETag": part["ETag"]}
             )
             await dm.update(_multipart=multipart, _block=dm.get("_block") + 1)
-        await util._s3aioclient.complete_multipart_upload(
-            Bucket=dm.get("_bucket_name"),
-            Key=dm.get("_upload_file_id"),
-            UploadId=dm.get("_mpu")["UploadId"],
-            MultipartUpload=dm.get("_multipart"),
-        )
+        async with util.s3_client() as client:
+            await client.complete_multipart_upload(
+                Bucket=dm.get("_bucket_name"),
+                Key=dm.get("_upload_file_id"),
+                UploadId=dm.get("_mpu")["UploadId"],
+                MultipartUpload=dm.get("_multipart"),
+            )
 
     async def exists(self):
         bucket = None
@@ -249,9 +257,8 @@ class S3FileStorageManager:
             bucket = file._bucket_name
         util = get_utility(IS3BlobStore)
         try:
-            return (
-                await util._s3aioclient.get_object(Bucket=bucket, Key=uri) is not None
-            )
+            async with util.s3_client() as client:
+                return await client.get_object(Bucket=bucket, Key=uri) is not None
         except botocore.exceptions.ClientError as ex:
             if ex.response["Error"]["Code"] == "NoSuchKey":
                 return False
@@ -267,11 +274,12 @@ class S3FileStorageManager:
         util = get_utility(IS3BlobStore)
 
         new_uri = generate_key(self.context)
-        await util._s3aioclient.copy_object(
-            CopySource={"Bucket": file._bucket_name, "Key": file.uri},
-            Bucket=file._bucket_name,
-            Key=new_uri,
-        )
+        async with util.s3_client() as client:
+            await client.copy_object(
+                CopySource={"Bucket": file._bucket_name, "Key": file.uri},
+                Bucket=file._bucket_name,
+                Key=new_uri,
+            )
         await to_dm.finish(
             values={
                 "content_type": file.content_type,
@@ -291,6 +299,10 @@ class S3BlobStore:
         self._aws_access_key = settings["aws_client_id"]
         self._aws_secret_key = settings["aws_client_secret"]
 
+        max_pool_connections = settings.get(
+            "max_pool_connections", DEFAULT_MAX_POOL_CONNECTIONS
+        )
+
         opts = dict(
             aws_secret_access_key=self._aws_secret_key,
             aws_access_key_id=self._aws_access_key,
@@ -299,9 +311,11 @@ class S3BlobStore:
             use_ssl=settings.get("ssl", True),
             region_name=settings.get("region_name"),
             config=aiobotocore.config.AioConfig(
-                None, max_pool_connections=settings.get("max_pool_connections", 30)
+                None, max_pool_connections=max_pool_connections
             ),
         )
+
+        self._s3_request_semaphore = asyncio.BoundedSemaphore(max_pool_connections)
 
         if loop is None:
             loop = asyncio.get_event_loop()
@@ -315,9 +329,28 @@ class S3BlobStore:
 
         self._bucket_name = settings["bucket"]
 
+        self._bucket_name_format = settings.get(
+            "bucket_name_format", "{container}{delimiter}{base}"
+        )
+
+    @contextlib.asynccontextmanager
+    async def s3_client(self):
+        async with self._s3_request_semaphore:
+            yield self._s3aioclient
+
     async def get_bucket_name(self):
         container = task_vars.container.get()
-        bucket_name = container.id.lower() + "." + self._bucket_name
+
+        if "." in self._bucket_name:
+            char_delimiter = "."
+        else:
+            char_delimiter = "-"
+
+        bucket_name = self._bucket_name_format.format(
+            container=container.id.lower(),
+            delimiter=char_delimiter,
+            base=self._bucket_name,
+        )
 
         bucket_name = bucket_name.replace("_", "-")
 
@@ -326,16 +359,18 @@ class S3BlobStore:
 
         missing = False
         try:
-            res = await self._s3aioclient.head_bucket(Bucket=bucket_name)
-            if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
-                missing = True
+            async with self.s3_client() as client:
+                res = await client.head_bucket(Bucket=bucket_name)
+                if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
+                    missing = True
         except botocore.exceptions.ClientError as e:
             error_code = int(e.response["Error"]["Code"])
             if error_code == 404:
                 missing = True
 
         if missing:
-            await self._s3aioclient.create_bucket(Bucket=bucket_name)
+            async with self.s3_client() as client:
+                await client.create_bucket(Bucket=bucket_name)
         return bucket_name
 
     async def initialize(self, app=None):
@@ -348,12 +383,14 @@ class S3BlobStore:
     async def iterate_bucket(self):
         container = task_vars.container.get()
         bucket_name = await self.get_bucket_name()
-        result = await self._s3aioclient.list_objects(
-            Bucket=bucket_name, Prefix=container.id + "/"
-        )
-        paginator = self._s3aioclient.get_paginator("list_objects")
-        async for result in paginator.paginate(
-            Bucket=bucket_name, Prefix=container.id + "/"
-        ):
-            for item in result.get("Contents", []):
-                yield item
+        async with self.s3_client() as client:
+            result = await client.list_objects(
+                Bucket=bucket_name, Prefix=container.id + "/"
+            )
+        async with self.s3_client() as client:
+            paginator = client.get_paginator("list_objects")
+            async for result in paginator.paginate(
+                Bucket=bucket_name, Prefix=container.id + "/"
+            ):
+                for item in result.get("Contents", []):
+                    yield item

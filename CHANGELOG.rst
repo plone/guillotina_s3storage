@@ -1,7 +1,20 @@
-5.0.9 (unreleased)
-------------------
+5.0.11 (unreleased)
+-------------------
 
 - Nothing changed yet.
+
+
+5.0.10 (2022-05-21)
+-------------------
+
+- Use a semaphore to control usage of aiobotocore client
+  See: https://github.com/aio-libs/aiobotocore/issues/738#issuecomment-639026068
+
+
+5.0.9 (2022-03-08)
+------------------
+
+- Allow bucket name delimiter config
 
 
 5.0.8 (2021-05-06)
