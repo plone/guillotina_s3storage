@@ -4,10 +4,11 @@ import contextlib
 import logging
 from typing import AsyncIterator
 
-import aiobotocore
 import aiohttp
 import backoff
 import botocore
+from aiobotocore.session import get_session
+from botocore.config import Config
 from guillotina import configure
 from guillotina import task_vars
 from guillotina.component import get_utility
@@ -108,16 +109,15 @@ class S3FileStorageManager:
                 bucket = file._bucket_name
 
         downloader = await self._download(uri, bucket, **kwargs)
-
         # we do not want to timeout ever from this...
         # downloader['Body'].set_socket_timeout(999999)
         async with downloader["Body"] as stream:
-            data = await stream.read(CHUNK_SIZE)
+            data = await stream.content.read(CHUNK_SIZE)
             while True:
                 if not data:
                     break
                 yield data
-                data = await stream.read(CHUNK_SIZE)
+                data = await stream.content.read(CHUNK_SIZE)
 
     async def range_supported(self) -> bool:
         return True
@@ -302,29 +302,19 @@ class S3BlobStore:
         max_pool_connections = settings.get(
             "max_pool_connections", DEFAULT_MAX_POOL_CONNECTIONS
         )
-
-        opts = dict(
+        self._loop = loop if loop is not None else asyncio.get_event_loop()
+        self._opts = dict(
             aws_secret_access_key=self._aws_secret_key,
             aws_access_key_id=self._aws_access_key,
             endpoint_url=settings.get("endpoint_url"),
-            verify=settings.get("verify_ssl"),
             use_ssl=settings.get("ssl", True),
             region_name=settings.get("region_name"),
-            config=aiobotocore.config.AioConfig(
-                None, max_pool_connections=max_pool_connections
-            ),
+            config=Config(max_pool_connections=max_pool_connections),
         )
 
+        self._s3aiosession = get_session()
         self._s3_request_semaphore = asyncio.BoundedSemaphore(max_pool_connections)
 
-        if loop is None:
-            loop = asyncio.get_event_loop()
-        self._loop = loop
-
-        self._s3aiosession = aiobotocore.get_session(loop=loop)
-
-        # This client is for downloads only
-        self._s3aioclient = self._s3aiosession.create_client("s3", **opts)
         self._cached_buckets = []
 
         self._bucket_name = settings["bucket"]
@@ -333,10 +323,14 @@ class S3BlobStore:
             "bucket_name_format", "{container}{delimiter}{base}"
         )
 
+    def _get_region_name(self):
+        return self._opts["region_name"]
+
     @contextlib.asynccontextmanager
     async def s3_client(self):
         async with self._s3_request_semaphore:
-            yield self._s3aioclient
+            async with self._s3aiosession.create_client("s3", **self._opts) as client:
+                yield client
 
     async def get_bucket_name(self):
         container = task_vars.container.get()
@@ -370,15 +364,12 @@ class S3BlobStore:
 
         if missing:
             async with self.s3_client() as client:
-                await client.create_bucket(Bucket=bucket_name)
+                await client.create_bucket(**self._get_bucket_kargs(bucket_name))
         return bucket_name
 
     async def initialize(self, app=None):
         # No asyncio loop to run
         self.app = app
-
-    async def finalize(self, app=None):
-        await self._s3aioclient.close()
 
     async def iterate_bucket(self):
         container = task_vars.container.get()
@@ -394,3 +385,11 @@ class S3BlobStore:
             ):
                 for item in result.get("Contents", []):
                     yield item
+
+    def _get_bucket_kargs(self, bucket_name: str):
+        bucket_kwargs = {"Bucket": bucket_name}
+        if self._get_region_name() != "us-east-1":
+            bucket_kwargs["CreateBucketConfiguration"] = {
+                "LocationConstraint": self._get_region_name(),
+            }
+        return bucket_kwargs

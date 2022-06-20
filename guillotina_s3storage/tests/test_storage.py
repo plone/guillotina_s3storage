@@ -24,7 +24,6 @@ from guillotina_s3storage.storage import DEFAULT_MAX_POOL_CONNECTIONS
 from guillotina_s3storage.storage import RETRIABLE_EXCEPTIONS
 from guillotina_s3storage.storage import S3FileField
 from guillotina_s3storage.storage import S3FileStorageManager
-from guillotina_s3storage.tests.mocks import AsyncMock
 
 
 _test_gif = base64.b64decode(
@@ -46,12 +45,14 @@ class FakeContentReader:
         return self._pointer >= len(self._file_data)
 
     async def readexactly(self, size):
+        breakpoint()
         data = self._file_data[self._pointer : self._pointer + size]
         self._pointer += len(data)
         if data:
             self.chunks_sent += 1
         if data and len(data) < size:
             raise asyncio.IncompleteReadError(data, size)
+        await asyncio.sleep(0)
         return data
 
     async def readany(self):
@@ -79,9 +80,10 @@ async def util(setup_container):
     util = get_utility(IS3BlobStore)
     # cleanup
     async for item in util.iterate_bucket():
-        await util._s3aioclient.delete_object(
-            Bucket=await util.get_bucket_name(), Key=item["Key"]
-        )
+        async with util.s3_client() as client:
+            await client.delete_object(
+                Bucket=await util.get_bucket_name(), Key=item["Key"]
+            )
 
     yield util
 
@@ -110,6 +112,7 @@ async def test_get_storage_object(util):
     assert await util.get_bucket_name() is not None
 
 
+@pytest.mark.usefixtures("util")
 async def test_store_file_in_cloud(upload_request):
     upload_request.headers.update(
         {
@@ -140,6 +143,7 @@ async def test_store_file_in_cloud(upload_request):
     assert len(await get_all_objects()) == 0
 
 
+@pytest.mark.usefixtures("util")
 async def test_store_file_uses_cached_request_data_on_retry(upload_request):
 
     upload_request.headers.update(
@@ -180,6 +184,7 @@ async def test_store_file_uses_cached_request_data_on_retry(upload_request):
     assert len(await get_all_objects()) == 0
 
 
+@pytest.mark.usefixtures("util")
 async def test_store_file_in_cloud_using_tus(upload_request):
     upload_request.headers.update(
         {
@@ -212,6 +217,7 @@ async def test_store_file_in_cloud_using_tus(upload_request):
     assert len(await get_all_objects()) == 0
 
 
+@pytest.mark.usefixtures("util")
 async def test_multipart_upload_with_tus(upload_request, reader):
     file_data = _test_gif
     while len(file_data) < (11 * 1024 * 1024):
@@ -262,6 +268,7 @@ async def test_multipart_upload_with_tus(upload_request, reader):
     assert len(await get_all_objects()) == 0
 
 
+@pytest.mark.usefixtures("util")
 async def test_large_file_with_upload(upload_request, reader):
     file_data = _test_gif
     while len(file_data) < (11 * 1024 * 1024):
@@ -299,6 +306,7 @@ async def test_large_file_with_upload(upload_request, reader):
     assert len(await get_all_objects()) == 0
 
 
+@pytest.mark.usefixtures("util")
 async def test_multipart_upload_with_tus_and_tid_conflict(upload_request, reader):
     file_data = _test_gif
     while len(file_data) < (11 * 1024 * 1024):
@@ -373,6 +381,7 @@ def test_gen_key(upload_request):
     assert last.split("::")[0] == ob.__uuid__
 
 
+@pytest.mark.usefixtures("util")
 async def test_copy(upload_request):
     upload_request.headers.update(
         {
@@ -412,6 +421,7 @@ async def test_copy(upload_request):
     assert len(items) == 2
 
 
+@pytest.mark.usefixtures("util")
 async def test_iterate_storage(util, upload_request, reader):
 
     upload_request.headers.update(
@@ -424,7 +434,9 @@ async def test_iterate_storage(util, upload_request, reader):
         }
     )
 
-    for idx in range(20):
+    items = []
+
+    for _ in range(20):
         reader.set(_test_gif)
         upload_request._cache_data = b""
         upload_request._last_read_pos = 0
@@ -433,40 +445,38 @@ async def test_iterate_storage(util, upload_request, reader):
         mng = FileManager(ob, upload_request, IContent["file"].bind(ob))
         await mng.upload()
 
-    items = []
     async for item in util.iterate_bucket():
         items.append(item)
     assert len(items) == 20
 
 
+@pytest.mark.usefixtures("util")
 async def test_download(upload_request, reader):
-
-    file_data = b""
-    # we want to test multiple chunks here...
-    while len(file_data) < CHUNK_SIZE:
-        file_data += _test_gif
-
     upload_request.headers.update(
         {
             "Content-Type": "image/gif",
-            "X-UPLOAD-MD5HASH": md5(file_data).hexdigest(),
+            "X-UPLOAD-MD5HASH": md5(_test_gif).hexdigest(),
             "X-UPLOAD-EXTENSION": "gif",
-            "X-UPLOAD-SIZE": len(file_data),
+            "X-UPLOAD-SIZE": len(_test_gif),
             "X-UPLOAD-FILENAME": "test.gif",
         }
     )
-    reader.set(file_data)
-    upload_request.send = AsyncMock()
+    reader.set(_test_gif)
+    upload_request._cache_data = b""
+    upload_request._last_read_pos = 0
     ob = create_content()
     ob.file = None
     mng = FileManager(ob, upload_request, IContent["file"].bind(ob))
     await mng.upload()
+
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
+    breakpoint()
     resp = await mng.download()
-    assert int(resp.content_length) == len(file_data)
+    assert int(resp.content_length) == len(_test_gif)
 
 
+@pytest.mark.usefixtures("util")
 async def test_raises_not_retryable(upload_request, reader):
 
     file_data = b""
@@ -495,6 +505,7 @@ async def test_raises_not_retryable(upload_request, reader):
         await mng.upload()
 
 
+@pytest.mark.usefixtures("util")
 async def test_save_file(upload_request):
 
     ob = create_content()
@@ -526,83 +537,95 @@ async def test_save_file_multipart(upload_request):
     assert len(items) == 1
 
 
+@pytest.mark.usefixtures("util")
 async def test_save_same_chunk_multiple_times(util, upload_request):
     upload_file_id = "foobar124"
     bucket_name = await util.get_bucket_name()
     multipart = {"Parts": []}
     block = 1
-    mpu = await util._s3aioclient.create_multipart_upload(
-        Bucket=bucket_name, Key=upload_file_id
-    )
 
-    part = await util._s3aioclient.upload_part(
-        Bucket=bucket_name,
-        Key=upload_file_id,
-        PartNumber=block,
-        UploadId=mpu["UploadId"],
-        Body=b"A" * 1024 * 1024 * 5,
-    )
+    async with util.s3_client() as client:
+        mpu = await client.create_multipart_upload(
+            Bucket=bucket_name, Key=upload_file_id
+        )
+
+    async with util.s3_client() as client:
+        part = await client.upload_part(
+            Bucket=bucket_name,
+            Key=upload_file_id,
+            PartNumber=block,
+            UploadId=mpu["UploadId"],
+            Body=b"A" * 1024 * 1024 * 5,
+        )
     multipart["Parts"].append({"PartNumber": block, "ETag": part["ETag"]})
     block += 1
 
-    part = await util._s3aioclient.upload_part(
-        Bucket=bucket_name,
-        Key=upload_file_id,
-        PartNumber=block,
-        UploadId=mpu["UploadId"],
-        Body=b"B" * 1024 * 1024 * 5,
-    )
+    async with util.s3_client() as client:
+        part = await client.upload_part(
+            Bucket=bucket_name,
+            Key=upload_file_id,
+            PartNumber=block,
+            UploadId=mpu["UploadId"],
+            Body=b"B" * 1024 * 1024 * 5,
+        )
     multipart["Parts"].append({"PartNumber": block, "ETag": part["ETag"]})
     block += 1
 
     # a couple more but do not save multipart
-    await util._s3aioclient.upload_part(
-        Bucket=bucket_name,
-        Key=upload_file_id,
-        PartNumber=block,
-        UploadId=mpu["UploadId"],
-        Body=b"C" * 1024 * 1024 * 5,
-    )
-    await util._s3aioclient.upload_part(
-        Bucket=bucket_name,
-        Key=upload_file_id,
-        PartNumber=block,
-        UploadId=mpu["UploadId"],
-        Body=b"D" * 1024 * 1024 * 5,
-    )
+    async with util.s3_client() as client:
+        await client.upload_part(
+            Bucket=bucket_name,
+            Key=upload_file_id,
+            PartNumber=block,
+            UploadId=mpu["UploadId"],
+            Body=b"C" * 1024 * 1024 * 5,
+        )
 
-    part = await util._s3aioclient.upload_part(
-        Bucket=bucket_name,
-        Key=upload_file_id,
-        PartNumber=block,
-        UploadId=mpu["UploadId"],
-        Body=b"E" * 1024 * 1024 * 5,
-    )
+    async with util.s3_client() as client:
+        await client.upload_part(
+            Bucket=bucket_name,
+            Key=upload_file_id,
+            PartNumber=block,
+            UploadId=mpu["UploadId"],
+            Body=b"D" * 1024 * 1024 * 5,
+        )
+
+    async with util.s3_client() as client:
+        part = await client.upload_part(
+            Bucket=bucket_name,
+            Key=upload_file_id,
+            PartNumber=block,
+            UploadId=mpu["UploadId"],
+            Body=b"E" * 1024 * 1024 * 5,
+        )
     multipart["Parts"].append({"PartNumber": block, "ETag": part["ETag"]})
     block += 1
 
-    await util._s3aioclient.complete_multipart_upload(
-        Bucket=bucket_name,
-        Key=upload_file_id,
-        UploadId=mpu["UploadId"],
-        MultipartUpload=multipart,
-    )
+    async with util.s3_client() as client:
+        await client.complete_multipart_upload(
+            Bucket=bucket_name,
+            Key=upload_file_id,
+            UploadId=mpu["UploadId"],
+            MultipartUpload=multipart,
+        )
 
-    ob = await util._s3aioclient.get_object(Bucket=bucket_name, Key=upload_file_id)
     data = b""
-    async with ob["Body"] as stream:
-        chunk = await stream.read(CHUNK_SIZE)
-        while True:
-            if not chunk:
-                break
-            data += chunk
-            chunk = await stream.read(CHUNK_SIZE)
+    async with util.s3_client() as client:
+        ob = await client.get_object(Bucket=bucket_name, Key=upload_file_id)
+        async with ob["Body"] as stream:
+            chunk = await stream.content.read(CHUNK_SIZE)
+            while True:
+                if not chunk:
+                    break
+                data += chunk
+                chunk = await stream.content.read(CHUNK_SIZE)
 
     assert data[0 : 1024 * 1024 * 5] == b"A" * 1024 * 1024 * 5
     assert data[1024 * 1024 * 5 : 1024 * 1024 * 10] == b"B" * 1024 * 1024 * 5
     assert data[1024 * 1024 * 10 : 1024 * 1024 * 15] == b"E" * 1024 * 1024 * 5
 
 
+@pytest.mark.usefixtures("util")
 async def test_upload_empty_file(upload_request):
 
     ob = create_content()
@@ -619,6 +642,7 @@ async def test_upload_empty_file(upload_request):
     assert len(items) == 1
 
 
+@pytest.mark.usefixtures("util")
 async def test_file_exists(upload_request):
 
     upload_request.headers.update(
@@ -657,19 +681,20 @@ async def test_file_exists(upload_request):
 
 @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=2)
 async def _test_exc_backoff(util):
-    error_class = util._s3aioclient.exceptions.from_code("InvalidPart")
-    raise error_class(
-        {
-            "Error": {
-                "Code": "InvalidPart",
-                "Message": "One or more of the specified parts could not be "
-                "found. The part might not have been uploaded, "
-                "or the specified entity tag might not have matched "
-                "the part's entity tag.",
-            }
-        },
-        "CompleteMultipartUpload",
-    )
+    async with util.s3_client() as client:
+        error_class = client.exceptions.from_code("InvalidPart")
+        raise error_class(
+            {
+                "Error": {
+                    "Code": "InvalidPart",
+                    "Message": "One or more of the specified parts could not be "
+                    "found. The part might not have been uploaded, "
+                    "or the specified entity tag might not have matched "
+                    "the part's entity tag.",
+                }
+            },
+            "CompleteMultipartUpload",
+        )
 
 
 async def test_catch_client_error(util, upload_request):
@@ -677,6 +702,7 @@ async def test_catch_client_error(util, upload_request):
         await _test_exc_backoff(util)
 
 
+@pytest.mark.usefixtures("util")
 async def test_read_range(upload_request):
     upload_request.headers.update(
         {
@@ -739,20 +765,21 @@ async def _upload_uri(client, bucket, uri):
     print(f"Stop uploading {uri}")
 
 
+@pytest.mark.usefixtures("util")
 async def test_connection_leak(util):
     bucket_name = await util.get_bucket_name()
-    client = util._s3aioclient
-
     tasks = []
-    test_uri_prefix = f"{random.randint(0, 999999)}-"
-    for idx in range(DEFAULT_MAX_POOL_CONNECTIONS * 2):
-        tasks.append(
-            asyncio.create_task(
-                _upload_uri(client, bucket_name, test_uri_prefix + str(idx))
-            )
-        )
 
-    done, pending = await asyncio.wait(tasks)
+    async with util.s3_client() as client:
+        test_uri_prefix = f"{random.randint(0, 999999)}-"
+        for idx in range(DEFAULT_MAX_POOL_CONNECTIONS * 2):
+            tasks.append(
+                asyncio.create_task(
+                    _upload_uri(client, bucket_name, test_uri_prefix + str(idx))
+                )
+            )
+
+        done, pending = await asyncio.wait(tasks)
     assert len(pending) == 0
 
     for task in done:
