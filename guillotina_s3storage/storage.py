@@ -2,7 +2,9 @@
 import asyncio
 import contextlib
 import logging
+from typing import Any
 from typing import AsyncIterator
+from typing import Dict
 
 import aiohttp
 import backoff
@@ -322,7 +324,7 @@ class S3BlobStore:
             "bucket_name_format", "{container}{delimiter}{base}"
         )
 
-    def _get_region_name(self):
+    def _get_region_name(self) -> str:
         return self._opts["region_name"]
 
     @contextlib.asynccontextmanager
@@ -392,7 +394,7 @@ class S3BlobStore:
                     yield item
 
     def _get_bucket_kargs(self, bucket_name: str):
-        bucket_kwargs = {"Bucket": bucket_name}
+        bucket_kwargs: Dict[str, Any] = {"Bucket": bucket_name}
         if self._get_region_name() != "us-east-1":
             bucket_kwargs["CreateBucketConfiguration"] = {
                 "LocationConstraint": self._get_region_name(),
