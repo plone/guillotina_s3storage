@@ -32,6 +32,16 @@ _test_gif = base64.b64decode(
 )
 
 
+@pytest.yield_fixture(scope="session")
+def event_loop(request):
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+
+pytestmark = pytest.mark.asyncio
+
+
 class FakeContentReader:
     def __init__(self, file_data=_test_gif):
         self.set(file_data)
