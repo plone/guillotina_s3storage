@@ -91,12 +91,12 @@ class S3FileStorageManager:
         return cleanup is None or cleanup.should_clean(file=file, field=self.field)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
-    async def _download(self, client, uri, bucket, **kwargs):
+    async def _download(self, uri, bucket, **kwargs):
         util = get_utility(IS3BlobStore)
         if bucket is None:
             bucket = await util.get_bucket_name()
-
-        return await client.get_object(Bucket=bucket, Key=uri, **kwargs)
+        async with util.s3_client() as client:
+            return await client.get_object(Bucket=bucket, Key=uri, **kwargs)
 
     async def iter_data(self, uri=None, **kwargs):
 
@@ -109,11 +109,13 @@ class S3FileStorageManager:
                 uri = file.uri
                 bucket = file._bucket_name
 
-        async with get_utility(IS3BlobStore).s3_client() as client:
-            downloader = await self._download(client, uri, bucket, **kwargs)
-            async with downloader["Body"] as stream:
-                async for data in stream.content.iter_chunked(CHUNK_SIZE):
-                    yield data
+        downloader = await self._download(uri, bucket, **kwargs)
+
+        # we do not want to timeout ever from this...
+        # downloader['Body'].set_socket_timeout(999999)
+        async with downloader["Body"] as stream:
+            async for data in stream.content.iter_chunked(CHUNK_SIZE):
+                yield data
 
     async def range_supported(self) -> bool:
         return True
@@ -308,6 +310,7 @@ class S3BlobStore:
             config=Config(max_pool_connections=max_pool_connections),
         )
 
+        self.exit_stack = contextlib.AsyncExitStack()
         self._s3aiosession = get_session()
         self._s3_request_semaphore = asyncio.BoundedSemaphore(max_pool_connections)
 
@@ -324,10 +327,8 @@ class S3BlobStore:
 
     @contextlib.asynccontextmanager
     async def s3_client(self):
-        # Maybe this is not needed anymore since we are creating the clients with the context manager
         async with self._s3_request_semaphore:
-            async with self._s3aiosession.create_client("s3", **self._opts) as client:
-                yield client
+            yield self._s3aioclient
 
     async def get_bucket_name(self):
         container = task_vars.container.get()
@@ -367,6 +368,13 @@ class S3BlobStore:
     async def initialize(self, app=None):
         # No asyncio loop to run
         self.app = app
+        self._s3aioclient = await self.exit_stack.enter_async_context(
+            self._s3aiosession.create_client("s3", **self._opts)
+        )
+
+    async def finalize(self, app=None):
+        await self._s3aioclient.close()
+        await self.exit_stack.aclose()
 
     async def iterate_bucket(self):
         container = task_vars.container.get()
