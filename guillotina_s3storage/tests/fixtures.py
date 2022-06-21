@@ -17,12 +17,13 @@ def settings_configurator(settings):
             "bucket_name_format": "{container}{delimiter}{base}",
             "aws_client_id": os.environ.get("S3CLOUD_ID", "x" * 10),
             "aws_client_secret": os.environ.get("S3CLOUD_SECRET", "x" * 10),  # noqa
+            "region_name": os.environ.get("S3REGION_NAME", "eu-west-3"),
         },
     }
 
     if "S3CLOUD_ID" not in os.environ:
         settings["load_utilities"]["s3"]["settings"].update(
-            {"endpoint_url": "http://localhost:4566", "verify_ssl": False, "ssl": False}
+            {"endpoint_url": "http://localhost:4566", "ssl": False}
         )
 
 

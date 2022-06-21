@@ -27,10 +27,10 @@ setup(
     install_requires=[
         "setuptools",
         "guillotina>=5.0.0,<7",
-        "aiohttp>3.0.0,<4.0.0",
+        "aiohttp>=3.3.1,<4.0.0",
         "ujson",
-        "aiobotocore==0.9.4",
-        "botocore==1.10.58",
+        "aiobotocore==2.3.3",
+        "botocore==1.24.21",
         "backoff",
     ],
     extras_require={

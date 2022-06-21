@@ -9,3 +9,4 @@ pip-selfcheck.json
 .idea
 .mypy_cache
 .python-version
+.venv
