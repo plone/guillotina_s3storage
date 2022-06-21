@@ -2,6 +2,7 @@ import asyncio
 import base64
 import random
 from hashlib import md5
+from unittest.mock import AsyncMock
 
 import backoff
 import botocore.exceptions
@@ -45,14 +46,12 @@ class FakeContentReader:
         return self._pointer >= len(self._file_data)
 
     async def readexactly(self, size):
-        breakpoint()
         data = self._file_data[self._pointer : self._pointer + size]
         self._pointer += len(data)
         if data:
             self.chunks_sent += 1
         if data and len(data) < size:
             raise asyncio.IncompleteReadError(data, size)
-        await asyncio.sleep(0)
         return data
 
     async def readany(self):
@@ -451,19 +450,26 @@ async def test_iterate_storage(util, upload_request, reader):
 
 
 @pytest.mark.usefixtures("util")
-async def test_download(upload_request, reader):
+@pytest.mark.asyncio
+async def test_download(upload_request, reader, util):
+    file_data = b""
+    # we want to test multiple chunks here...
+    while len(file_data) < CHUNK_SIZE:
+        file_data += _test_gif
+
     upload_request.headers.update(
         {
             "Content-Type": "image/gif",
-            "X-UPLOAD-MD5HASH": md5(_test_gif).hexdigest(),
+            "X-UPLOAD-MD5HASH": md5(file_data).hexdigest(),
             "X-UPLOAD-EXTENSION": "gif",
-            "X-UPLOAD-SIZE": len(_test_gif),
+            "X-UPLOAD-SIZE": len(file_data),
             "X-UPLOAD-FILENAME": "test.gif",
         }
     )
-    reader.set(_test_gif)
+    reader.set(file_data)
     upload_request._cache_data = b""
     upload_request._last_read_pos = 0
+    upload_request.send = AsyncMock()
     ob = create_content()
     ob.file = None
     mng = FileManager(ob, upload_request, IContent["file"].bind(ob))
@@ -471,9 +477,9 @@ async def test_download(upload_request, reader):
 
     assert ob.file._upload_file_id is None
     assert ob.file.uri is not None
-    breakpoint()
+
     resp = await mng.download()
-    assert int(resp.content_length) == len(_test_gif)
+    assert int(resp.content_length) == len(file_data)
 
 
 @pytest.mark.usefixtures("util")
@@ -549,7 +555,6 @@ async def test_save_same_chunk_multiple_times(util, upload_request):
             Bucket=bucket_name, Key=upload_file_id
         )
 
-    async with util.s3_client() as client:
         part = await client.upload_part(
             Bucket=bucket_name,
             Key=upload_file_id,
@@ -557,10 +562,9 @@ async def test_save_same_chunk_multiple_times(util, upload_request):
             UploadId=mpu["UploadId"],
             Body=b"A" * 1024 * 1024 * 5,
         )
-    multipart["Parts"].append({"PartNumber": block, "ETag": part["ETag"]})
-    block += 1
+        multipart["Parts"].append({"PartNumber": block, "ETag": part["ETag"]})
+        block += 1
 
-    async with util.s3_client() as client:
         part = await client.upload_part(
             Bucket=bucket_name,
             Key=upload_file_id,
@@ -568,11 +572,10 @@ async def test_save_same_chunk_multiple_times(util, upload_request):
             UploadId=mpu["UploadId"],
             Body=b"B" * 1024 * 1024 * 5,
         )
-    multipart["Parts"].append({"PartNumber": block, "ETag": part["ETag"]})
-    block += 1
+        multipart["Parts"].append({"PartNumber": block, "ETag": part["ETag"]})
+        block += 1
 
-    # a couple more but do not save multipart
-    async with util.s3_client() as client:
+        # a couple more but do not save multipart
         await client.upload_part(
             Bucket=bucket_name,
             Key=upload_file_id,
@@ -580,8 +583,6 @@ async def test_save_same_chunk_multiple_times(util, upload_request):
             UploadId=mpu["UploadId"],
             Body=b"C" * 1024 * 1024 * 5,
         )
-
-    async with util.s3_client() as client:
         await client.upload_part(
             Bucket=bucket_name,
             Key=upload_file_id,
@@ -589,8 +590,6 @@ async def test_save_same_chunk_multiple_times(util, upload_request):
             UploadId=mpu["UploadId"],
             Body=b"D" * 1024 * 1024 * 5,
         )
-
-    async with util.s3_client() as client:
         part = await client.upload_part(
             Bucket=bucket_name,
             Key=upload_file_id,
@@ -598,10 +597,8 @@ async def test_save_same_chunk_multiple_times(util, upload_request):
             UploadId=mpu["UploadId"],
             Body=b"E" * 1024 * 1024 * 5,
         )
-    multipart["Parts"].append({"PartNumber": block, "ETag": part["ETag"]})
-    block += 1
-
-    async with util.s3_client() as client:
+        multipart["Parts"].append({"PartNumber": block, "ETag": part["ETag"]})
+        block += 1
         await client.complete_multipart_upload(
             Bucket=bucket_name,
             Key=upload_file_id,

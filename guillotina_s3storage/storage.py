@@ -91,14 +91,15 @@ class S3FileStorageManager:
         return cleanup is None or cleanup.should_clean(file=file, field=self.field)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
-    async def _download(self, uri, bucket, **kwargs):
+    async def _download(self, client, uri, bucket, **kwargs):
         util = get_utility(IS3BlobStore)
         if bucket is None:
             bucket = await util.get_bucket_name()
-        async with util.s3_client() as client:
-            return await client.get_object(Bucket=bucket, Key=uri, **kwargs)
+
+        return await client.get_object(Bucket=bucket, Key=uri, **kwargs)
 
     async def iter_data(self, uri=None, **kwargs):
+
         bucket = None
         if uri is None:
             file = self.field.query(self.field.context or self.context, None)
@@ -108,16 +109,11 @@ class S3FileStorageManager:
                 uri = file.uri
                 bucket = file._bucket_name
 
-        downloader = await self._download(uri, bucket, **kwargs)
-        # we do not want to timeout ever from this...
-        # downloader['Body'].set_socket_timeout(999999)
-        async with downloader["Body"] as stream:
-            data = await stream.content.read(CHUNK_SIZE)
-            while True:
-                if not data:
-                    break
-                yield data
-                data = await stream.content.read(CHUNK_SIZE)
+        async with get_utility(IS3BlobStore).s3_client() as client:
+            downloader = await self._download(client, uri, bucket, **kwargs)
+            async with downloader["Body"] as stream:
+                async for data in stream.content.iter_chunked(CHUNK_SIZE):
+                    yield data
 
     async def range_supported(self) -> bool:
         return True
@@ -296,13 +292,13 @@ class S3FileStorageManager:
 
 class S3BlobStore:
     def __init__(self, settings, loop=None):
+
         self._aws_access_key = settings["aws_client_id"]
         self._aws_secret_key = settings["aws_client_secret"]
 
         max_pool_connections = settings.get(
             "max_pool_connections", DEFAULT_MAX_POOL_CONNECTIONS
         )
-        self._loop = loop if loop is not None else asyncio.get_event_loop()
         self._opts = dict(
             aws_secret_access_key=self._aws_secret_key,
             aws_access_key_id=self._aws_access_key,
@@ -328,6 +324,7 @@ class S3BlobStore:
 
     @contextlib.asynccontextmanager
     async def s3_client(self):
+        # Maybe this is not needed anymore since we are creating the clients with the context manager
         async with self._s3_request_semaphore:
             async with self._s3aiosession.create_client("s3", **self._opts) as client:
                 yield client
