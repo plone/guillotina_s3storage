@@ -1,3 +1,9 @@
+5.0.12 (unreleased)
+-------------------
+
+- Allow retrieving single pages of items from a bucket, with configurable prefix
+
+
 5.0.11 (unreleased)
 -------------------
 

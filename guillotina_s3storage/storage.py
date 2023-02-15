@@ -77,7 +77,6 @@ class S3FileField(Object):
     for_=(IResource, IRequest, IS3FileField), provides=IS3FileStorageManager
 )
 class S3FileStorageManager:
-
     file_class = S3File
 
     def __init__(self, context, request, field):
@@ -394,3 +393,15 @@ class S3BlobStore:
             ):
                 for item in result.get("Contents", []):
                     yield item
+
+    async def iterate_bucket_page(self, page_token=None, prefix=None):
+        container = task_vars.container.get()
+        bucket_name = await self.get_bucket_name()
+        async with self.s3_client() as client:
+            args = {
+                "Bucket": bucket_name,
+                "Prefix": prefix or container.id + "/",
+            }
+            if page_token:
+                args["ContinuationToken"] = page_token
+            yield await client.list_objects_v2(**args)
