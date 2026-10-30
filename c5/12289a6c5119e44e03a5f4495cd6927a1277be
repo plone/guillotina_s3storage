@@ -1,0 +1,31 @@
+CHANGELOG.rst
+  s_b4e1b8bab17905::t_040f6f6df26320 4
+MANIFEST.in
+  s_b4e1b8bab17905::t_2e28d36363d3ce 3
+setup.py
+  s_2c6be8918a10f0::t_6e63666fbbefe3 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c512289a6c5119e44e03a5f4495cd6927a1277be",
+  "prompts": {},
+  "sessions": {
+    "s_2c6be8918a10f0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e7376bf5cffedW6o6zHTvdXrtK",
+        "model": "unknown"
+      },
+      "human_author": "Roger Boixader Güell <rboixaderg@gmail.com>"
+    },
+    "s_b4e1b8bab17905": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a18c7c-b2b2-7240-a92b-fe803b8c2b04",
+        "model": "deepseek-v4.1-flash"
+      },
+      "human_author": "Roger Boixader Güell <rboixaderg@gmail.com>"
+    }
+  }
+}
