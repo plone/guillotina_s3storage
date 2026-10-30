@@ -1,0 +1,16 @@
+Makefile
+  h_1727aeeb492b30 18
+setup.cfg
+  h_1727aeeb492b30 4-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "15e18eacc031b6e484fc32f312e77a81908b3b92",
+  "prompts": {},
+  "humans": {
+    "h_1727aeeb492b30": {
+      "author": "Roger Boixader Güell <rboixaderg@gmail.com>"
+    }
+  }
+}
