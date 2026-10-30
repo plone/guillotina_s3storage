@@ -1,0 +1,14 @@
+.github/workflows/ci.yml
+  h_1727aeeb492b30 8-9,12,30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dc9ef4eb4c7cb036ac3e75b3edd5813b5d6112e3",
+  "prompts": {},
+  "humans": {
+    "h_1727aeeb492b30": {
+      "author": "Roger Boixader Güell <rboixaderg@gmail.com>"
+    }
+  }
+}
