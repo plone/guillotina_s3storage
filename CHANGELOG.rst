@@ -1,7 +1,7 @@
 5.0.11 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Fix licence metadata: the package is BSD-2-Clause (see LICENSE); setup.py wrongly declared GPL version 3. Include LICENSE in the sdist.
 
 
 5.0.10 (2022-05-21)

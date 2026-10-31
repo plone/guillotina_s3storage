@@ -16,7 +16,7 @@ setup(
     author_email="ramon@plone.org",
     keywords="async aiohttp guillotina s3",
     url="https://pypi.python.org/pypi/guillotina_s3storage",
-    license="GPL version 3",
+    license="BSD-2-Clause",
     setup_requires=[
         "pytest-runner",
     ],
